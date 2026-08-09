@@ -1,0 +1,67 @@
+$ mysql -u root -e "USE vet_system; SHOW TABLES;"
++----------------------+
+| Tables_in_vet_system |
++----------------------+
+| duenos               |
+| mascotas             |
+| turnos               |
+| veterinarios         |
++----------------------+
+
+$ DESCRIBE duenos;
++----------+--------------+------+-----+---------+----------------+
+| Field    | Type         | Null | Key | Default | Extra          |
++----------+--------------+------+-----+---------+----------------+
+| id       | bigint       | NO   | PRI | NULL    | auto_increment |
+| apellido | varchar(255) | NO   |     | NULL    |                |
+| dni      | varchar(255) | NO   | UNI | NULL    |                |
+| email    | varchar(255) | NO   |     | NULL    |                |
+| nombre   | varchar(255) | NO   |     | NULL    |                |
+| telefono | varchar(255) | YES  |     | NULL    |                |
++----------+--------------+------+-----+---------+----------------+
+
+$ DESCRIBE mascotas;
++------------------+--------------+------+-----+---------+----------------+
+| Field            | Type         | Null | Key | Default | Extra          |
++------------------+--------------+------+-----+---------+----------------+
+| id               | bigint       | NO   | PRI | NULL    | auto_increment |
+| especie          | varchar(255) | NO   |     | NULL    |                |
+| fecha_nacimiento | date         | YES  |     | NULL    |                |
+| nombre           | varchar(255) | NO   |     | NULL    |                |
+| raza             | varchar(255) | YES  |     | NULL    |                |
+| dueno_id         | bigint       | NO   | MUL | NULL    |                |
++------------------+--------------+------+-----+---------+----------------+
+
+$ DESCRIBE turnos;
++----------------+-------------------------------------------------------+------+-----+---------+----------------+
+| Field          | Type                                                  | Null | Key | Default | Extra          |
++----------------+-------------------------------------------------------+------+-----+---------+----------------+
+| id             | bigint                                                | NO   | PRI | NULL    | auto_increment |
+| estado         | enum('CANCELADO','EN_CURSO','FINALIZADO','PENDIENTE') | NO   |     | NULL    |                |
+| fecha          | date                                                  | NO   |     | NULL    |                |
+| hora           | time                                                  | NO   |     | NULL    |                |
+| motivo         | varchar(255)                                          | NO   |     | NULL    |                |
+| observaciones  | varchar(255)                                          | YES  |     | NULL    |                |
+| mascota_id     | bigint                                                | NO   | MUL | NULL    |                |
+| veterinario_id | bigint                                                | NO   | MUL | NULL    |                |
++----------------+-------------------------------------------------------+------+-----+---------+----------------+
+
+$ DESCRIBE veterinarios;
++--------------+--------------+------+-----+---------+----------------+
+| Field        | Type         | Null | Key | Default | Extra          |
++--------------+--------------+------+-----+---------+----------------+
+| id           | bigint       | NO   | PRI | NULL    | auto_increment |
+| apellido     | varchar(255) | NO   |     | NULL    |                |
+| especialidad | varchar(255) | NO   |     | NULL    |                |
+| matricula    | varchar(255) | NO   | UNI | NULL    |                |
+| nombre       | varchar(255) | NO   |     | NULL    |                |
++--------------+--------------+------+-----+---------+----------------+
+
+$ Foreign keys
++------------+----------------+-----------------------+
+| TABLE_NAME | COLUMN_NAME    | REFERENCED_TABLE_NAME |
++------------+----------------+-----------------------+
+| mascotas   | dueno_id       | duenos                |
+| turnos     | veterinario_id | veterinarios          |
+| turnos     | mascota_id     | mascotas              |
++------------+----------------+-----------------------+
