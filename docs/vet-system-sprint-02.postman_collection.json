@@ -1,0 +1,247 @@
+{
+  "info": {
+    "name": "vet-system - Sprint 2 - CRUD Dueno",
+    "description": "Clinica Veterinaria 'Patitas Felices' - Universidad de Palermo - Microservicios y APIs Escalables 2026.\n\nLas 6 pruebas del Sprint 2 en el orden en que hay que correrlas. Cada request tiene un test que verifica el codigo HTTP esperado.\n\nCorrer con la app levantada (./mvnw spring-boot:run) y la tabla duenos vacia.\n\nUsar 'Run collection' para ejecutar las 6 en orden.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "duenoId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Prueba 1 - POST crear dueno (201 Created)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Codigo 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Devuelve el id generado', function () {",
+              "    pm.expect(pm.response.json()).to.have.property('id');",
+              "});",
+              "// Guarda el id para las pruebas siguientes",
+              "pm.collectionVariables.set('duenoId', pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"nombre\": \"Carlos\",\n    \"apellido\": \"Gonzalez\",\n    \"dni\": \"28543210\",\n    \"telefono\": \"1145678901\",\n    \"email\": \"carlos.gonzalez@email.com\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/duenos", "host": ["{{baseUrl}}"], "path": ["api", "duenos"] },
+        "description": "Crea un dueno nuevo. Debe devolver 201 Created con el objeto persistido y su id."
+      }
+    },
+    {
+      "name": "Prueba 2 - GET listar todos (200 OK)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Codigo 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Devuelve un array', function () {",
+              "    pm.expect(pm.response.json()).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/duenos", "host": ["{{baseUrl}}"], "path": ["api", "duenos"] },
+        "description": "Lista todos los duenos. Si no hay ninguno devuelve 200 con un array vacio, no 404: la coleccion existe aunque este vacia."
+      }
+    },
+    {
+      "name": "Prueba 3a - GET por id existente (200 OK)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Codigo 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/duenos/{{duenoId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "duenos", "{{duenoId}}"]
+        }
+      }
+    },
+    {
+      "name": "Prueba 3b - GET id inexistente (404 Not Found)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Codigo 404 Not Found', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/duenos/999",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "duenos", "999"]
+        },
+        "description": "El Service lanza ResourceNotFoundException y el Controller la traduce a 404."
+      }
+    },
+    {
+      "name": "Prueba 4 - POST con DNI duplicado (409 Conflict)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Codigo 409 Conflict', function () {",
+              "    pm.response.to.have.status(409);",
+              "});",
+              "pm.test('Mensaje descriptivo', function () {",
+              "    pm.expect(pm.response.text()).to.include('28543210');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"nombre\": \"Maria\",\n    \"apellido\": \"Lopez\",\n    \"dni\": \"28543210\",\n    \"email\": \"maria@email.com\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/duenos", "host": ["{{baseUrl}}"], "path": ["api", "duenos"] },
+        "description": "Mismo DNI que la Prueba 1. El Service valida con existsByDni y lanza DuplicateResourceException -> 409."
+      }
+    },
+    {
+      "name": "Prueba 5 - PUT actualizar (200 OK)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Codigo 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('El nombre se actualizo', function () {",
+              "    pm.expect(pm.response.json().nombre).to.eql('Carlos Alberto');",
+              "});",
+              "pm.test('El DNI NO se modifico (es el identificador de negocio)', function () {",
+              "    pm.expect(pm.response.json().dni).to.eql('28543210');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"nombre\": \"Carlos Alberto\",\n    \"apellido\": \"Gonzalez\",\n    \"telefono\": \"1199887766\",\n    \"email\": \"carlos.gonzalez.nuevo@email.com\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/duenos/{{duenoId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "duenos", "{{duenoId}}"]
+        },
+        "description": "El body no lleva dni: updateDueno solo copia nombre, apellido, telefono y email sobre la entidad cargada de la base."
+      }
+    },
+    {
+      "name": "Prueba 6a - DELETE existente (204 No Content)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Codigo 204 No Content', function () {",
+              "    pm.response.to.have.status(204);",
+              "});",
+              "pm.test('Sin cuerpo en la respuesta', function () {",
+              "    pm.expect(pm.response.text()).to.be.empty;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/duenos/{{duenoId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "duenos", "{{duenoId}}"]
+        }
+      }
+    },
+    {
+      "name": "Prueba 6b - DELETE el mismo otra vez (404 Not Found)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Codigo 404 Not Found', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/duenos/{{duenoId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "duenos", "{{duenoId}}"]
+        },
+        "description": "Segunda llamada al mismo id: ya no existe, el Service lanza ResourceNotFoundException -> 404."
+      }
+    }
+  ]
+}

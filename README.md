@@ -11,10 +11,13 @@ Sistema de gestión de una clínica veterinaria, construido sprint a sprint desd
 - [Nombre Apellido 1] — TODO
 - [Nombre Apellido 2] — TODO
 
-## Sprint actual: Sprint 1 — Kickoff + Dominio + Setup
+## Sprint actual: Sprint 2 — Arquitectura MVC + REST + CRUD Dueño
 
-Proyecto Spring Boot creado, entidades JPA modeladas, persistencia verificada contra MySQL
-(las 4 tablas se crean solas vía `ddl-auto=update`) y endpoint de verificación respondiendo.
+CRUD completo de Dueño expuesto como API REST, con las tres capas separadas
+(Controller → Service → Repository) y códigos HTTP correctos en cada caso.
+
+Sprint 1 (cerrado): proyecto Spring Boot creado, entidades JPA modeladas, persistencia
+verificada contra MySQL (las 4 tablas se crean solas vía `ddl-auto=update`).
 
 ## Stack
 
@@ -83,7 +86,7 @@ versión correcta de Maven la primera vez.
    curl http://localhost:8080/api/duenos
    ```
 
-   Respuesta esperada: `vet-system OK - Sprint 1. CRUD de duenos: Sprint 2.`
+   Respuesta esperada: `[]` (array vacío) con HTTP 200 si no hay dueños cargados.
 
 7. Confirmar las tablas en MySQL:
 
@@ -105,19 +108,70 @@ relaciones entre entidades (Dueño, Mascota, Veterinario, Turno).
 ```
 src/main/java/com/vetSystem/vet_system/
 ├── VetSystemApplication.java
-├── model/          ← entidades JPA (Sprint 1)
-├── repository/     ← interfaces JPA (Sprint 2)
-├── service/        ← lógica de negocio (Sprint 2)
-└── controller/     ← endpoints REST (Sprint 1: solo el de verificación)
+├── controller/
+│   └── DuenoController.java              ← capa HTTP (Sprint 2)
+├── service/
+│   └── DuenoService.java                 ← lógica de negocio (Sprint 2)
+├── repository/
+│   └── DuenoRepository.java              ← acceso a datos (Sprint 2)
+├── exception/
+│   ├── ResourceNotFoundException.java    ← → HTTP 404 (Sprint 2)
+│   └── DuplicateResourceException.java   ← → HTTP 409 (Sprint 2)
+└── model/
+    ├── Dueno.java
+    ├── Mascota.java
+    ├── Veterinario.java
+    ├── Turno.java
+    └── EstadoTurno.java
 ```
 
-## Endpoints
+**Regla de las capas:** el Controller no tiene lógica de negocio, el Service no habla
+directamente con la base, el Repository no valida reglas de negocio.
 
-| Método | Ruta          | Descripción                                     | Sprint |
-|--------|---------------|-------------------------------------------------|--------|
-| GET    | `/api/duenos` | Verificación de que el contexto Spring levanta   | 1      |
+## API REST — Dueño
 
-El CRUD completo de Dueño se implementa en el Sprint 2.
+| Método | Ruta                | Éxito              | Error                          |
+|--------|---------------------|--------------------|--------------------------------|
+| GET    | `/api/duenos`       | `200 OK` + lista   | —                              |
+| GET    | `/api/duenos/{id}`  | `200 OK` + dueño   | `404` si el id no existe       |
+| POST   | `/api/duenos`       | `201 Created`      | `409` si el DNI ya está usado  |
+| PUT    | `/api/duenos/{id}`  | `200 OK` + dueño   | `404` si el id no existe       |
+| DELETE | `/api/duenos/{id}`  | `204 No Content`   | `404` si el id no existe       |
+
+El `PUT` **no actualiza el DNI**: es el identificador de negocio del dueño.
+
+### Probar la API
+
+Colección de Postman lista para importar:
+[`docs/vet-system-sprint-02.postman_collection.json`](docs/vet-system-sprint-02.postman_collection.json)
+— 8 requests con tests que verifican el código HTTP de cada uno. Importala en Postman y
+usá **Run collection** con la tabla `duenos` vacía.
+
+Salida real de las 6 pruebas del sprint:
+[`docs/evidencia-sprint-02.txt`](docs/evidencia-sprint-02.txt).
+
+### Limitación conocida (se resuelve en el Sprint 3)
+
+`GET /api/duenos` devuelve JSON recursivo si algún dueño tiene mascotas asociadas:
+Jackson serializa `Dueno → mascotas → Mascota → dueno → …` hasta cortar en
+`Document nesting depth (1001) exceeded`. En el Sprint 2 no se nota porque todavía no hay
+CRUD de Mascota, pero si insertás una mascota a mano en MySQL, se reproduce.
+Se arregla en el Sprint 3 con `@JsonIgnore` / `@JsonManagedReference`, que es justamente
+uno de los temas de ese sprint.
+
+## Definition of Done — Sprint 2
+
+- [x] `DuenoRepository` creado con `existsByDni()` y `findByEmail()`
+- [x] `ResourceNotFoundException` creada en el paquete `exception/`
+- [x] `DuenoService` con los 5 métodos y validación de DNI duplicado
+- [x] `DuenoController` con los 5 endpoints REST y `ResponseEntity` correcto
+- [x] `GET /api/duenos` retorna HTTP 200 con la lista de dueños
+- [x] `GET /api/duenos/{id}` retorna HTTP 200 si existe y HTTP 404 si no
+- [x] `POST /api/duenos` retorna HTTP 201 al crear y HTTP 409 si el DNI ya existe
+- [x] `PUT /api/duenos/{id}` retorna HTTP 200 con los datos actualizados
+- [x] `DELETE /api/duenos/{id}` retorna HTTP 204 y HTTP 404 si no existe
+- [x] Colección Postman exportada y subida a `/docs`
+- [ ] Rama `sprint-02` en GitHub con PR hacia `main` — *pendiente: push + PR*
 
 ## Definition of Done — Sprint 1
 
@@ -130,13 +184,13 @@ El CRUD completo de Dueño se implementa en el Sprint 2.
 - [x] Endpoint de verificación `/api/duenos` responde HTTP 200
 - [x] Estructura de paquetes model/repository/service/controller lista
 - [x] README con instrucciones de ejecución reales y verificadas
-- [ ] Repositorio GitHub creado con la rama `sprint-01` y acceso del docente — *pendiente*
+- [x] Repositorio GitHub creado con acceso del docente
 - [ ] Screenshot de las tablas subido a `/docs` — *pendiente (la evidencia en texto ya está)*
 - [ ] Diagrama de clases (foto del papel) subido a `/docs` — *ya hay versión en texto en `docs/diagrama-clases.md`*
 
-## Próximo sprint (Sprint 2)
+## Próximo sprint (Sprint 3)
 
-- Patrón Repository para cada entidad
-- Capa Service con lógica de negocio
-- CRUD completo de Dueño expuesto como REST
-- Pruebas con Postman (GET, POST, PUT, DELETE)
+- CRUD completo de Mascota con la relación a Dueño
+- Resolver el JSON circular (`@JsonIgnore` / `@JsonManagedReference`)
+- Primer contacto con JPQL para consultas personalizadas
+- `GET /api/duenos/{id}/mascotas` — endpoint anidado

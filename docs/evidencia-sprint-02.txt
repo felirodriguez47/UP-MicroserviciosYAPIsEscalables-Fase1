@@ -1,0 +1,43 @@
+Sprint 2 - Verificacion de los 5 endpoints REST de Dueno
+Ejecutado con la app corriendo en localhost:8080 contra MySQL local.
+Cada bloque muestra el request y el codigo HTTP devuelto.
+
+### Prueba 1 - POST crear dueno -> esperado 201
+HTTP 201
+{"id":2,"nombre":"Ana","apellido":"Martinez","dni":"30111222","telefono":"1156781234","email":"ana.martinez@email.com","mascotas":null}
+
+### Prueba 2 - GET listar todos -> esperado 200
+[{"id":1,"nombre":"Carlos","apellido":"Gonzalez","dni":"28543210","telefono":"1145678901","email":"carlos.gonzalez@email.com","mascotas":[]},{"id":2,"nombre":"Ana","apellido":"Martinez","dni":"30111222","telefono":"1156781234","email":"ana.martinez@email.com","mascotas":[]}]
+HTTP 200
+
+### Prueba 3a - GET por id existente -> esperado 200
+{"id":1,"nombre":"Carlos","apellido":"Gonzalez","dni":"28543210","telefono":"1145678901","email":"carlos.gonzalez@email.com","mascotas":[]}
+HTTP 200
+
+### Prueba 3b - GET id inexistente 999 -> esperado 404
+Dueno con id 999 no fue encontrado
+HTTP 404
+
+### Prueba 4 - POST con DNI duplicado -> esperado 409
+Ya existe un dueno con DNI: 28543210
+HTTP 409
+
+### Prueba 5a - PUT actualizar -> esperado 200
+{"id":1,"nombre":"Carlos Alberto","apellido":"Gonzalez","dni":"28543210","telefono":"1199887766","email":"carlos.gonzalez.nuevo@email.com","mascotas":[]}
+HTTP 200
+
+### Prueba 5b - PUT id inexistente -> esperado 404
+Dueno con id 999 no fue encontrado
+HTTP 404
+
+### Prueba 6a - DELETE existente -> esperado 204
+
+HTTP 204
+
+### Prueba 6b - DELETE el mismo otra vez -> esperado 404
+Dueno con id 1 no fue encontrado
+HTTP 404
+
+### Verificacion: el DNI del PUT no se modifico y el delete persistio
+[{"id":2,"nombre":"Ana","apellido":"Martinez","dni":"30111222","telefono":"1156781234","email":"ana.martinez@email.com","mascotas":[]}]
+HTTP 200
