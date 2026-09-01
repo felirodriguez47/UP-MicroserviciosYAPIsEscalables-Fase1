@@ -1,7 +1,9 @@
 package com.vetSystem.vet_system.service;
 
+import com.vetSystem.vet_system.dto.DuenoDTO;
 import com.vetSystem.vet_system.exception.DuplicateResourceException;
 import com.vetSystem.vet_system.exception.ResourceNotFoundException;
+import com.vetSystem.vet_system.mapper.DuenoMapper;
 import com.vetSystem.vet_system.model.Dueno;
 import com.vetSystem.vet_system.repository.DuenoRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,67 +15,59 @@ import java.util.List;
 /**
  * Capa de negocio para Dueno.
  *
- * No sabe nada de HTTP: no conoce ResponseEntity, ni codigos de estado, ni
- * @RequestBody. Comunica los errores lanzando excepciones de dominio, y es el
- * Controller el que decide como se traducen a respuestas HTTP. Gracias a eso
- * este Service se podria reusar desde un job programado o desde un consumidor
- * de mensajes sin cambiar una linea.
+ * Refactor del Sprint 4: antes devolvia entidades Dueno, ahora devuelve
+ * DuenoDTO. La conversion pasa aca adentro, dentro de la transaccion, para
+ * que el Controller nunca reciba una entidad JPA ni un proxy LAZY.
+ *
+ * Sigue sin saber nada de HTTP: comunica errores con excepciones de dominio.
  */
 @Service
-@RequiredArgsConstructor  // Lombok genera el constructor con los campos final
+@RequiredArgsConstructor
 public class DuenoService {
 
-    // Constructor injection (via @RequiredArgsConstructor) en vez de @Autowired
-    // sobre el campo: permite que el campo sea final (inmutable), deja explicitas
-    // las dependencias en la firma del constructor, y hace la clase testeable
-    // con un new DuenoService(mockRepo) sin necesitar el contexto de Spring.
     private final DuenoRepository duenoRepository;
+    private final DuenoMapper duenoMapper;
 
     @Transactional(readOnly = true)
-    public List<Dueno> getAllDuenos() {
-        return duenoRepository.findAll();
+    public List<DuenoDTO> getAllDuenos() {
+        return duenoMapper.toDTOList(duenoRepository.findAll());
     }
 
-    /** Busca por ID. Lanza ResourceNotFoundException (-> 404) si no existe. */
     @Transactional(readOnly = true)
-    public Dueno getDuenoById(Long id) {
-        return duenoRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Dueno", id));
+    public DuenoDTO getDuenoById(Long id) {
+        return duenoMapper.toDTO(buscarOFallar(id));
     }
 
-    /** Crea un dueno. Lanza DuplicateResourceException (-> 409) si el DNI ya existe. */
     @Transactional
-    public Dueno createDueno(Dueno dueno) {
-        if (duenoRepository.existsByDni(dueno.getDni())) {
-            throw new DuplicateResourceException(
-                    "Ya existe un dueno con DNI: " + dueno.getDni());
+    public DuenoDTO createDueno(DuenoDTO dto) {
+        if (duenoRepository.existsByDni(dto.getDni())) {
+            throw new DuplicateResourceException("Ya existe un dueno con DNI: " + dto.getDni());
         }
-        return duenoRepository.save(dueno);
+        Dueno dueno = duenoMapper.toEntity(dto);
+        // El id llega siempre null a la entidad: el DTO puede traerlo, pero se
+        // descarta para que un POST nunca pueda sobrescribir una fila existente.
+        dueno.setId(null);
+        return duenoMapper.toDTO(duenoRepository.save(dueno));
     }
 
-    /**
-     * Actualiza un dueno existente.
-     *
-     * No se hace duenoRepository.save(duenoActualizado) directo porque ese objeto
-     * viene del JSON sin id y sin dni: guardarlo insertaria una fila nueva en vez
-     * de actualizar. Se carga la entidad de la base y se le copian solo los campos
-     * editables.
-     */
     @Transactional
-    public Dueno updateDueno(Long id, Dueno duenoActualizado) {
-        Dueno dueno = getDuenoById(id);  // reutiliza la validacion de existencia
-        dueno.setNombre(duenoActualizado.getNombre());
-        dueno.setApellido(duenoActualizado.getApellido());
-        dueno.setTelefono(duenoActualizado.getTelefono());
-        dueno.setEmail(duenoActualizado.getEmail());
+    public DuenoDTO updateDueno(Long id, DuenoDTO dto) {
+        Dueno dueno = buscarOFallar(id);
+        dueno.setNombre(dto.getNombre());
+        dueno.setApellido(dto.getApellido());
+        dueno.setTelefono(dto.getTelefono());
+        dueno.setEmail(dto.getEmail());
         // El DNI no se actualiza: es el identificador de negocio del dueno.
-        return duenoRepository.save(dueno);
+        return duenoMapper.toDTO(duenoRepository.save(dueno));
     }
 
-    /** Elimina un dueno. Lanza ResourceNotFoundException (-> 404) si no existe. */
     @Transactional
     public void deleteDueno(Long id) {
-        Dueno dueno = getDuenoById(id);  // valida que existe antes de borrar
-        duenoRepository.delete(dueno);
+        duenoRepository.delete(buscarOFallar(id));
+    }
+
+    private Dueno buscarOFallar(Long id) {
+        return duenoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dueno", id));
     }
 }

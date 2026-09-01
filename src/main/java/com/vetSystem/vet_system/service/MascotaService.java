@@ -1,7 +1,9 @@
 package com.vetSystem.vet_system.service;
 
+import com.vetSystem.vet_system.dto.MascotaDTO;
 import com.vetSystem.vet_system.exception.DuplicateResourceException;
 import com.vetSystem.vet_system.exception.ResourceNotFoundException;
+import com.vetSystem.vet_system.mapper.MascotaMapper;
 import com.vetSystem.vet_system.model.Dueno;
 import com.vetSystem.vet_system.model.Mascota;
 import com.vetSystem.vet_system.repository.DuenoRepository;
@@ -12,81 +14,74 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Capa de negocio para Mascota.
- *
- * Inyecta DuenoRepository ademas del propio: para crear una mascota hay que
- * validar que el dueno existe, y esa es una regla de negocio, no de HTTP.
- */
 @Service
 @RequiredArgsConstructor
 public class MascotaService {
 
     private final MascotaRepository mascotaRepository;
     private final DuenoRepository duenoRepository;
+    private final MascotaMapper mascotaMapper;
 
     @Transactional(readOnly = true)
-    public List<Mascota> getAllMascotas() {
-        return mascotaRepository.findAll();
+    public List<MascotaDTO> getAllMascotas() {
+        return mascotaMapper.toDTOList(mascotaRepository.findAll());
     }
 
     @Transactional(readOnly = true)
-    public Mascota getMascotaById(Long id) {
-        return mascotaRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Mascota", id));
+    public MascotaDTO getMascotaById(Long id) {
+        return mascotaMapper.toDTO(buscarOFallar(id));
     }
 
     /**
-     * Mascotas de un dueno. Valida primero que el dueno exista para poder
-     * distinguir "el dueno no existe" (404) de "el dueno existe pero no tiene
-     * mascotas" (200 con lista vacia). Sin esta validacion, ambos casos
-     * devolverian una lista vacia y el cliente no podria diferenciarlos.
+     * Valida primero que el dueno exista, para poder distinguir "el dueno no
+     * existe" (404) de "el dueno existe pero no tiene mascotas" (200 con lista
+     * vacia). Sin la validacion, los dos casos devolverian lo mismo.
      */
     @Transactional(readOnly = true)
-    public List<Mascota> getMascotasByDueno(Long duenoId) {
+    public List<MascotaDTO> getMascotasByDueno(Long duenoId) {
         if (!duenoRepository.existsById(duenoId)) {
             throw new ResourceNotFoundException("Dueno", duenoId);
         }
-        return mascotaRepository.findByDuenoId(duenoId);
+        return mascotaMapper.toDTOList(mascotaRepository.findByDuenoId(duenoId));
     }
 
-    /**
-     * Crea una mascota para un dueno existente.
-     *
-     * El duenoId viaja por la URL (?duenoId=1) y no dentro del JSON: la mascota
-     * NO puede existir sin dueno, asi que la pertenencia es parte de la ruta.
-     */
     @Transactional
-    public Mascota createMascota(Long duenoId, Mascota mascota) {
+    public MascotaDTO createMascota(Long duenoId, MascotaDTO dto) {
         Dueno dueno = duenoRepository.findById(duenoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Dueno", duenoId));
 
-        if (mascotaRepository.existsByNombreAndDuenoId(mascota.getNombre(), duenoId)) {
+        if (mascotaRepository.existsByNombreAndDuenoId(dto.getNombre(), duenoId)) {
             throw new DuplicateResourceException(
-                    "El dueno " + duenoId + " ya tiene una mascota llamada " + mascota.getNombre());
+                    "El dueno " + duenoId + " ya tiene una mascota llamada " + dto.getNombre());
         }
 
-        // Setear el lado propietario de la relacion es OBLIGATORIO: la FK vive en
-        // la tabla mascotas y Hibernate la lee de Mascota.dueno, no de la lista
-        // Dueno.mascotas (que es solo el lado inverso, marcado con mappedBy).
+        Mascota mascota = mascotaMapper.toEntity(dto);
+        // Setear el lado propietario es OBLIGATORIO: la FK vive en la tabla
+        // mascotas y Hibernate la lee de Mascota.dueno, no de Dueno.mascotas
+        // (que es el lado inverso, marcado con mappedBy).
         mascota.setDueno(dueno);
-        return mascotaRepository.save(mascota);
+        return mascotaMapper.toDTO(mascotaRepository.save(mascota));
     }
 
     @Transactional
-    public Mascota updateMascota(Long id, Mascota datos) {
-        Mascota mascota = getMascotaById(id);
-        mascota.setNombre(datos.getNombre());
-        mascota.setEspecie(datos.getEspecie());
-        mascota.setRaza(datos.getRaza());
-        mascota.setFechaNacimiento(datos.getFechaNacimiento());
-        // El dueno no se cambia por PUT: una mascota no "cambia de dueno" con un
-        // update de datos. Si hiciera falta, seria un endpoint propio.
-        return mascotaRepository.save(mascota);
+    public MascotaDTO updateMascota(Long id, MascotaDTO dto) {
+        Mascota mascota = buscarOFallar(id);
+        mascota.setNombre(dto.getNombre());
+        mascota.setEspecie(dto.getEspecie());
+        mascota.setRaza(dto.getRaza());
+        mascota.setFechaNacimiento(dto.getFechaNacimiento());
+        // El dueno no cambia por PUT: seria un cambio de titularidad, no un
+        // update de datos. Si hiciera falta, iria en su propio endpoint.
+        return mascotaMapper.toDTO(mascotaRepository.save(mascota));
     }
 
     @Transactional
     public void deleteMascota(Long id) {
-        mascotaRepository.delete(getMascotaById(id));
+        mascotaRepository.delete(buscarOFallar(id));
+    }
+
+    private Mascota buscarOFallar(Long id) {
+        return mascotaRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Mascota", id));
     }
 }

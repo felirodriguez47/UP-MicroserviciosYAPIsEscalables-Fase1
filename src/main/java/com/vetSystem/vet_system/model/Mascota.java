@@ -1,6 +1,5 @@
 package com.vetSystem.vet_system.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -28,10 +27,6 @@ public class Mascota {
 
     // Muchas mascotas pertenecen a un dueño
     // @JoinColumn define el nombre de la FK en la tabla mascotas
-    // @JsonBackReference: este es el lado "hijo" (el que ES el elemento).
-    // Jackson lo OMITE al serializar, y ahi se corta el bucle
-    // Dueno -> mascotas -> Mascota -> dueno -> Dueno -> ...
-    @JsonBackReference
     // Excluida de toString/equals: ver comentario en Dueno.mascotas
     @ToString.Exclude
     @EqualsAndHashCode.Exclude

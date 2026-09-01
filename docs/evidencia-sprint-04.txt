@@ -1,0 +1,58 @@
+Sprint 4 - DTOs con MapStruct + CRUD Veterinario y Turno
+Ejecutado con la app en localhost:8080 contra MySQL local.
+
+### SETUP - dueno + mascota (ahora devuelven DTO, sin lista anidada)
+{"id":1,"nombre":"Ana","apellido":"Martinez","dni":"30112233","telefono":"1145670000","email":"ana@email.com"}
+>>> HTTP 201
+{"id":1,"nombre":"Firulais","especie":"perro","raza":"labrador","fechaNacimiento":"2021-03-15","duenoId":1,"duenoNombre":"Ana"}
+>>> HTTP 201
+{"id":2,"nombre":"Michi","especie":"gato","raza":"siames","fechaNacimiento":"2022-07-20","duenoId":1,"duenoNombre":"Ana"}
+>>> HTTP 201
+
+### 1 - Crear veterinario -> 201
+{"id":1,"nombre":"Leandro","apellido":"Perez","matricula":"MV-4521","especialidad":"Clinica General"}
+>>> HTTP 201
+
+### 2 - Crear turno -> 201 (TurnoResponseDTO con nombres, no objetos)
+{"id":1,"fecha":"2026-07-10","hora":"10:30:00","motivo":"Control anual","estado":"PENDIENTE","observaciones":null,"mascotaId":1,"mascotaNombre":"Firulais","veterinarioId":1,"veterinarioNombre":"Leandro"}
+>>> HTTP 201
+
+### 3 - Turno superpuesto (mismo vet, misma fecha/hora) -> 409
+El veterinario 1 ya tiene un turno el 2026-07-10 a las 10:30
+>>> HTTP 409
+
+### 3b - Mismo horario pero OTRO dia -> 201 (no es superposicion)
+>>> HTTP 201
+
+### 4 - Agenda del veterinario -> 200
+[{"id":1,"fecha":"2026-07-10","hora":"10:30:00","motivo":"Control anual","estado":"PENDIENTE","observaciones":null,"mascotaId":1,"mascotaNombre":"Firulais","veterinarioId":1,"veterinarioNombre":"Leandro"}]
+>>> HTTP 200
+
+### 5 - PATCH estado a FINALIZADO -> 200
+{"id":1,"fecha":"2026-07-10","hora":"10:30:00","motivo":"Control anual","estado":"FINALIZADO","observaciones":"Consulta sin novedades","mascotaId":1,"mascotaNombre":"Firulais","veterinarioId":1,"veterinarioNombre":"Leandro"}
+>>> HTTP 200
+
+### 6 - Matricula duplicada -> 409
+Matricula ya registrada: MV-4521
+>>> HTTP 409
+
+### 7 - Turno con mascota inexistente -> 404
+Mascota con id 999 no fue encontrado
+>>> HTTP 404
+
+### 8 - REFACTOR: GET /api/duenos/1 ya NO trae la lista de mascotas (DuenoDTO)
+{"id":1,"nombre":"Ana","apellido":"Martinez","dni":"30112233","telefono":"1145670000","email":"ana@email.com"}
+>>> HTTP 200
+
+### 9 - GET /api/mascotas: duenoId y duenoNombre planos (MascotaDTO)
+[{"id":1,"nombre":"Firulais","especie":"perro","raza":"labrador","fechaNacimiento":"2021-03-15","duenoId":1,"duenoNombre":"Ana"},{"id":2,"nombre":"Michi","especie":"gato","raza":"siames","fechaNacimiento":"2022-07-20","duenoId":1,"duenoNombre":"Ana"}]
+>>> HTTP 200
+
+### 10 - Endpoint anidado sigue funcionando -> 200
+>>> HTTP 200
+
+### 11 - CRUD veterinario: GET, PUT, DELETE
+GET all   >>> HTTP 200
+GET /999  >>> HTTP 404
+PUT /1    >>> HTTP 200
+DEL /999  >>> HTTP 404

@@ -1,6 +1,5 @@
 package com.vetSystem.vet_system.model;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
@@ -35,10 +34,6 @@ public class Dueno {
     // Excluida de toString/equals: con la relación bidireccional Dueno <-> Mascota,
     // incluirla provoca recursión infinita (StackOverflowError) y fuerza la carga
     // de la colección LAZY.
-    // @JsonManagedReference: este es el lado "padre" (el que TIENE la lista).
-    // Jackson SI lo serializa: el JSON del Dueno incluye sus mascotas.
-    // El corte del bucle lo hace el otro lado (@JsonBackReference en Mascota).
-    @JsonManagedReference
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     @OneToMany(mappedBy = "dueno", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
