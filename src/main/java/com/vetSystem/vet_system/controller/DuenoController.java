@@ -3,7 +3,9 @@ package com.vetSystem.vet_system.controller;
 import com.vetSystem.vet_system.exception.DuplicateResourceException;
 import com.vetSystem.vet_system.exception.ResourceNotFoundException;
 import com.vetSystem.vet_system.model.Dueno;
+import com.vetSystem.vet_system.model.Mascota;
 import com.vetSystem.vet_system.service.DuenoService;
+import com.vetSystem.vet_system.service.MascotaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,11 +26,27 @@ import java.util.List;
 public class DuenoController {
 
     private final DuenoService duenoService;
+    private final MascotaService mascotaService;
 
     /** GET /api/duenos -> 200 OK con la lista completa (puede venir vacia). */
     @GetMapping
     public ResponseEntity<List<Dueno>> getAllDuenos() {
         return ResponseEntity.ok(duenoService.getAllDuenos());
+    }
+
+    /**
+     * GET /api/duenos/{id}/mascotas -> mascotas de ese dueno.
+     *
+     * Endpoint anidado: la URL expresa la pertenencia. Vive en DuenoController
+     * y no en MascotaController porque el recurso raiz de la ruta es el dueno.
+     */
+    @GetMapping("/{id}/mascotas")
+    public ResponseEntity<?> getMascotasByDueno(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(mascotaService.getMascotasByDueno(id));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 
     /** GET /api/duenos/{id} -> 200 OK, o 404 Not Found si no existe. */
