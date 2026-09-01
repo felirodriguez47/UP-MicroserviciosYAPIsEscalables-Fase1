@@ -1,9 +1,8 @@
 package com.vetSystem.vet_system.controller;
 
 import com.vetSystem.vet_system.dto.VeterinarioDTO;
-import com.vetSystem.vet_system.exception.DuplicateResourceException;
-import com.vetSystem.vet_system.exception.ResourceNotFoundException;
 import com.vetSystem.vet_system.service.VeterinarioService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,40 +23,24 @@ public class VeterinarioController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getVeterinarioById(@PathVariable Long id) {
-        try {
-            return ResponseEntity.ok(veterinarioService.getVeterinarioById(id));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ResponseEntity<VeterinarioDTO> getVeterinarioById(@PathVariable Long id) {
+        return ResponseEntity.ok(veterinarioService.getVeterinarioById(id));
     }
 
     @PostMapping
-    public ResponseEntity<?> createVeterinario(@RequestBody VeterinarioDTO dto) {
-        try {
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(veterinarioService.createVeterinario(dto));
-        } catch (DuplicateResourceException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-        }
+    public ResponseEntity<VeterinarioDTO> createVeterinario(@Valid @RequestBody VeterinarioDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(veterinarioService.createVeterinario(dto));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateVeterinario(@PathVariable Long id, @RequestBody VeterinarioDTO dto) {
-        try {
-            return ResponseEntity.ok(veterinarioService.updateVeterinario(id, dto));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ResponseEntity<VeterinarioDTO> updateVeterinario(@PathVariable Long id,
+                                                            @Valid @RequestBody VeterinarioDTO dto) {
+        return ResponseEntity.ok(veterinarioService.updateVeterinario(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteVeterinario(@PathVariable Long id) {
-        try {
-            veterinarioService.deleteVeterinario(id);
-            return ResponseEntity.noContent().build();
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ResponseEntity<Void> deleteVeterinario(@PathVariable Long id) {
+        veterinarioService.deleteVeterinario(id);
+        return ResponseEntity.noContent().build();
     }
 }

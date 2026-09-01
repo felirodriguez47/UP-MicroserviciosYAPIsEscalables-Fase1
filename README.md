@@ -11,18 +11,28 @@ Sistema de gestión de una clínica veterinaria, construido sprint a sprint desd
 - [Nombre Apellido 1] — TODO
 - [Nombre Apellido 2] — TODO
 
-## Sprint actual: Sprint 2 — Arquitectura MVC + REST + CRUD Dueño
+## Sprint actual: Sprint 5 — Validaciones + manejo global de errores
 
-CRUD completo de Dueño expuesto como API REST, con las tres capas separadas
-(Controller → Service → Repository) y códigos HTTP correctos en cada caso.
+API REST completa de la clínica: CRUD de Dueño, Mascota, Veterinario y Turno, con DTOs,
+validación de entrada y respuestas de error uniformes.
 
-Sprint 1 (cerrado): proyecto Spring Boot creado, entidades JPA modeladas, persistencia
-verificada contra MySQL (las 4 tablas se crean solas vía `ddl-auto=update`).
+> **Para estudiar: [`docs/GUIA-SPRINTS.md`](docs/GUIA-SPRINTS.md)** — qué se construyó en
+> cada sprint, qué concepto hay que poder defender, dónde está en el código y las preguntas
+> probables del oral.
+
+| Sprint | Rama | Tema |
+|--------|------|------|
+| 1 | `main` | Dominio + Setup (4 entidades JPA, MySQL) |
+| 2 | `sprint-02` | MVC + REST + CRUD Dueño |
+| 3 | `sprint-03` | Relaciones + CRUD Mascota + JSON circular |
+| 4 | `sprint-04` | DTOs + MapStruct + CRUD Turno y Veterinario |
+| 5 | `sprint-05` | Bean Validation + `@ControllerAdvice` |
 
 ## Stack
 
 - Java 21 · Spring Boot 4.1.0
-- Spring Web, Spring Data JPA (Hibernate 7), Lombok, DevTools
+- Spring Web, Spring Data JPA (Hibernate 7), Bean Validation, Lombok, DevTools
+- MapStruct 1.5.5.Final (mappers entidad ↔ DTO generados en compilación)
 - MySQL — verificado contra 9.7.1 (la fórmula `mysql` de Homebrew). El dialecto lo
   autodetecta Hibernate, así que 8.x también funciona sin cambiar nada.
 
@@ -108,89 +118,125 @@ relaciones entre entidades (Dueño, Mascota, Veterinario, Turno).
 ```
 src/main/java/com/vetSystem/vet_system/
 ├── VetSystemApplication.java
-├── controller/
-│   └── DuenoController.java              ← capa HTTP (Sprint 2)
-├── service/
-│   └── DuenoService.java                 ← lógica de negocio (Sprint 2)
-├── repository/
-│   └── DuenoRepository.java              ← acceso a datos (Sprint 2)
-├── exception/
-│   ├── ResourceNotFoundException.java    ← → HTTP 404 (Sprint 2)
-│   └── DuplicateResourceException.java   ← → HTTP 409 (Sprint 2)
-└── model/
-    ├── Dueno.java
-    ├── Mascota.java
-    ├── Veterinario.java
-    ├── Turno.java
-    └── EstadoTurno.java
+├── controller/     DuenoController · MascotaController · VeterinarioController · TurnoController
+├── service/        DuenoService · MascotaService · VeterinarioService · TurnoService
+├── repository/     DuenoRepository · MascotaRepository · VeterinarioRepository · TurnoRepository
+├── dto/            DuenoDTO · MascotaDTO · VeterinarioDTO · TurnoRequestDTO · TurnoResponseDTO
+├── mapper/         DuenoMapper · MascotaMapper · VeterinarioMapper · TurnoMapper  (MapStruct)
+├── exception/      ResourceNotFoundException · DuplicateResourceException
+│                   TurnoSuperpuestoException · ErrorResponse · GlobalExceptionHandler
+└── model/          Dueno · Mascota · Veterinario · Turno · EstadoTurno  (entidades JPA)
 ```
 
 **Regla de las capas:** el Controller no tiene lógica de negocio, el Service no habla
-directamente con la base, el Repository no valida reglas de negocio.
+directamente con la base, el Repository no valida reglas de negocio. Las entidades JPA no
+tienen anotaciones de serialización: eso es responsabilidad de los DTOs.
 
-## API REST — Dueño
+## API REST
 
-| Método | Ruta                | Éxito              | Error                          |
-|--------|---------------------|--------------------|--------------------------------|
-| GET    | `/api/duenos`       | `200 OK` + lista   | —                              |
-| GET    | `/api/duenos/{id}`  | `200 OK` + dueño   | `404` si el id no existe       |
-| POST   | `/api/duenos`       | `201 Created`      | `409` si el DNI ya está usado  |
-| PUT    | `/api/duenos/{id}`  | `200 OK` + dueño   | `404` si el id no existe       |
-| DELETE | `/api/duenos/{id}`  | `204 No Content`   | `404` si el id no existe       |
+### Dueño — `/api/duenos`
 
-El `PUT` **no actualiza el DNI**: es el identificador de negocio del dueño.
+| Método | Ruta | Éxito | Error |
+|--------|------|-------|-------|
+| GET | `/api/duenos` | `200` + lista | — |
+| GET | `/api/duenos/{id}` | `200` | `404` |
+| GET | `/api/duenos/{id}/mascotas` | `200` + lista | `404` si el dueño no existe |
+| POST | `/api/duenos` | `201` | `400` inválido · `409` DNI duplicado |
+| PUT | `/api/duenos/{id}` | `200` | `400` · `404` |
+| DELETE | `/api/duenos/{id}` | `204` | `404` · `409` si tiene turnos agendados |
+
+### Mascota — `/api/mascotas`
+
+| Método | Ruta | Éxito | Error |
+|--------|------|-------|-------|
+| GET | `/api/mascotas` | `200` + lista | — |
+| GET | `/api/mascotas/{id}` | `200` | `404` |
+| POST | `/api/mascotas?duenoId={id}` | `201` | `400` · `404` dueño · `409` nombre repetido |
+| PUT | `/api/mascotas/{id}` | `200` | `400` · `404` |
+| DELETE | `/api/mascotas/{id}` | `204` | `404` · `409` si tiene turnos |
+
+### Veterinario — `/api/veterinarios`
+
+| Método | Ruta | Éxito | Error |
+|--------|------|-------|-------|
+| GET | `/api/veterinarios` | `200` + lista | — |
+| GET | `/api/veterinarios/{id}` | `200` | `404` |
+| POST | `/api/veterinarios` | `201` | `400` · `409` matrícula duplicada |
+| PUT | `/api/veterinarios/{id}` | `200` | `400` · `404` |
+| DELETE | `/api/veterinarios/{id}` | `204` | `404` · `409` si tiene turnos |
+
+### Turno — `/api/turnos`
+
+| Método | Ruta | Éxito | Error |
+|--------|------|-------|-------|
+| GET | `/api/turnos` | `200` + lista | — |
+| GET | `/api/turnos/{id}` | `200` | `404` |
+| GET | `/api/turnos/agenda?veterinarioId={id}&fecha={yyyy-MM-dd}` | `200` + lista | — |
+| POST | `/api/turnos` | `201` | `400` · `404` · `409` horario superpuesto |
+| PATCH | `/api/turnos/{id}/estado?estado={E}&observaciones={txt}` | `200` | `400` · `404` |
+
+Un turno **no se borra**: se cancela con `PATCH ?estado=CANCELADO`, para no perder el
+historial clínico de la mascota. `DELETE /api/turnos/{id}` devuelve `405 Method Not Allowed`.
+
+Reglas de negocio aplicadas:
+- El `PUT` de Dueño **no actualiza el DNI**; el de Veterinario **no actualiza la matrícula**.
+  Son identificadores de negocio.
+- Un veterinario no puede tener dos turnos la misma fecha y hora → `409`.
+- Un dueño no puede tener dos mascotas con el mismo nombre → `409`.
+
+### Formato de error
+
+Todas las respuestas de error usan la misma estructura:
+
+```json
+{
+    "timestamp": "2026-09-01T19:39:14.557147",
+    "status": 404,
+    "error": "Not Found",
+    "mensaje": "Dueno con id 9999 no fue encontrado",
+    "path": "/api/duenos/9999"
+}
+```
 
 ### Probar la API
 
-Colección de Postman lista para importar:
+Colección de Postman:
 [`docs/vet-system-sprint-02.postman_collection.json`](docs/vet-system-sprint-02.postman_collection.json)
-— 8 requests con tests que verifican el código HTTP de cada uno. Importala en Postman y
-usá **Run collection** con la tabla `duenos` vacía.
+(cubre el CRUD de Dueño del Sprint 2).
 
-Salida real de las 6 pruebas del sprint:
-[`docs/evidencia-sprint-02.txt`](docs/evidencia-sprint-02.txt).
+Salida real de las pruebas de cada sprint:
+[`evidencia-sprint-01`](docs/evidencia-sprint-01.txt) ·
+[`02`](docs/evidencia-sprint-02.txt) ·
+[`03`](docs/evidencia-sprint-03.txt) ·
+[`04`](docs/evidencia-sprint-04.txt) ·
+[`05`](docs/evidencia-sprint-05.txt)
 
-### Limitación conocida (se resuelve en el Sprint 3)
+## Definition of Done
 
-`GET /api/duenos` devuelve JSON recursivo si algún dueño tiene mascotas asociadas:
-Jackson serializa `Dueno → mascotas → Mascota → dueno → …` hasta cortar en
-`Document nesting depth (1001) exceeded`. En el Sprint 2 no se nota porque todavía no hay
-CRUD de Mascota, pero si insertás una mascota a mano en MySQL, se reproduce.
-Se arregla en el Sprint 3 con `@JsonIgnore` / `@JsonManagedReference`, que es justamente
-uno de los temas de ese sprint.
+**Sprint 5** — Bean Validation en los 4 DTOs de entrada · `@Valid` en todos los POST/PUT ·
+`ErrorResponse` · `GlobalExceptionHandler` con 9 handlers · excepciones tipadas ·
+try-catch eliminados de los 4 controllers · ningún endpoint devuelve 500 por error del
+cliente. ✅
 
-## Definition of Done — Sprint 2
+**Sprint 4** — MapStruct configurado · 5 DTOs · 4 mappers · CRUD Veterinario · CRUD Turno con
+validación de superposición · `PATCH /estado` · `GET /agenda` · Dueño y Mascota
+refactorizados a DTOs · anotaciones Jackson eliminadas de las entidades. ✅
 
-- [x] `DuenoRepository` creado con `existsByDni()` y `findByEmail()`
-- [x] `ResourceNotFoundException` creada en el paquete `exception/`
-- [x] `DuenoService` con los 5 métodos y validación de DNI duplicado
-- [x] `DuenoController` con los 5 endpoints REST y `ResponseEntity` correcto
-- [x] `GET /api/duenos` retorna HTTP 200 con la lista de dueños
-- [x] `GET /api/duenos/{id}` retorna HTTP 200 si existe y HTTP 404 si no
-- [x] `POST /api/duenos` retorna HTTP 201 al crear y HTTP 409 si el DNI ya existe
-- [x] `PUT /api/duenos/{id}` retorna HTTP 200 con los datos actualizados
-- [x] `DELETE /api/duenos/{id}` retorna HTTP 204 y HTTP 404 si no existe
-- [x] Colección Postman exportada y subida a `/docs`
-- [ ] Rama `sprint-02` en GitHub con PR hacia `main` — *pendiente: push + PR*
+**Sprint 3** — `@JsonManagedReference`/`@JsonBackReference` · `MascotaRepository` ·
+`MascotaService` · `MascotaController` · `GET /api/duenos/{id}/mascotas` · JSON circular
+resuelto (37.982 → 105 bytes). ✅
 
-## Definition of Done — Sprint 1
+**Sprint 2** — `DuenoRepository` · `DuenoService` · `DuenoController` con 5 endpoints ·
+200/201/204/404/409 correctos · colección Postman. ✅
 
-- [x] Proyecto Spring Boot 4.1.0 con todas las dependencias configuradas
-- [x] `application.properties` conecta a MySQL
-- [x] Las 4 entidades JPA (Dueño, Mascota, Veterinario, Turno) implementadas
-- [x] Enum `EstadoTurno` definido
-- [x] La aplicación compila y levanta sin errores (`./mvnw spring-boot:run`)
-- [x] Las 4 tablas existen en MySQL, con sus 3 foreign keys — ver `docs/evidencia-sprint-01.txt`
-- [x] Endpoint de verificación `/api/duenos` responde HTTP 200
-- [x] Estructura de paquetes model/repository/service/controller lista
-- [x] README con instrucciones de ejecución reales y verificadas
-- [x] Repositorio GitHub creado con acceso del docente
-- [ ] Screenshot de las tablas subido a `/docs` — *pendiente (la evidencia en texto ya está)*
-- [ ] Diagrama de clases (foto del papel) subido a `/docs` — *ya hay versión en texto en `docs/diagrama-clases.md`*
+**Sprint 1** — 4 entidades JPA · `EstadoTurno` · conexión MySQL · 4 tablas + 3 FKs creadas
+por Hibernate. ✅
 
-## Próximo sprint (Sprint 3)
+**Pendiente en todos los sprints:** push de las ramas a GitHub y PR hacia `main`.
 
-- CRUD completo de Mascota con la relación a Dueño
-- Resolver el JSON circular (`@JsonIgnore` / `@JsonManagedReference`)
-- Primer contacto con JPQL para consultas personalizadas
-- `GET /api/duenos/{id}/mascotas` — endpoint anidado
+## Próximo sprint (Sprint 6)
+
+- Testing: JUnit 5 + Mockito para tests unitarios de Services
+- MockMvc para tests de integración de Controllers
+- Patrón Arrange-Act-Assert (AAA)
+- Criterios de cobertura: qué vale la pena testear y qué no

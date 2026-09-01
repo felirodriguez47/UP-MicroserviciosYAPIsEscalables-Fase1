@@ -57,6 +57,14 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Bean Validation (@NotBlank, @Email, @FutureOrPresent...).
+             Desde Spring Boot 3 NO viene incluida en spring-boot-starter-web:
+             hay que agregar este starter aparte o las anotaciones no compilan. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
         <!-- MapStruct: genera los mappers entidad <-> DTO en tiempo de compilacion -->
         <dependency>
             <groupId>org.mapstruct</groupId>
