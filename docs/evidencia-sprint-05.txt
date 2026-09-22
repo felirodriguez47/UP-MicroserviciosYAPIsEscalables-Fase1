@@ -1,0 +1,89 @@
+Sprint 5 - Bean Validation + GlobalExceptionHandler
+Ejecutado con la app en localhost:8080 contra MySQL local.
+Toda respuesta de error usa la estructura ErrorResponse.
+
+### SETUP
+dueno   >>> HTTP 201
+mascota >>> HTTP 201
+vet     >>> HTTP 201
+turno   >>> HTTP 201
+
+=========== TABLA DE VERIFICACION DEL DOC (Sprint 5) ===========
+
+### 1 - POST /api/duenos body vacio {} -> 400
+{"timestamp":"2026-09-01T19:39:14.451525","status":400,"error":"Bad Request","mensaje":"El apellido es obligatorio; El DNI es obligatorio; El email es obligatorio; El nombre es obligatorio","path":"/api/duenos"}
+>>> HTTP 400
+
+### 2 - POST /api/duenos email invalido -> 400
+{"timestamp":"2026-09-01T19:39:14.460395","status":400,"error":"Bad Request","mensaje":"El email no tiene un formato valido","path":"/api/duenos"}
+>>> HTTP 400
+
+### 3 - POST /api/duenos nombre vacio -> 400
+{"timestamp":"2026-09-01T19:39:14.467703","status":400,"error":"Bad Request","mensaje":"El nombre es obligatorio","path":"/api/duenos"}
+>>> HTTP 400
+
+### 4 - GET /api/duenos/9999 -> 404
+{"timestamp":"2026-09-01T19:39:14.476617","status":404,"error":"Not Found","mensaje":"Dueno con id 9999 no fue encontrado","path":"/api/duenos/9999"}
+>>> HTTP 404
+
+### 5 - POST /api/duenos DNI duplicado -> 409
+{"timestamp":"2026-09-01T19:39:14.485268","status":409,"error":"Conflict","mensaje":"Ya existe un dueno con DNI: 30112233","path":"/api/duenos"}
+>>> HTTP 409
+
+### 6 - POST /api/turnos fecha pasada -> 400
+{"timestamp":"2026-09-01T19:39:14.492899","status":400,"error":"Bad Request","mensaje":"No se puede agendar un turno en una fecha pasada","path":"/api/turnos"}
+>>> HTTP 400
+
+### 7 - POST /api/turnos superpuesto -> 409
+{"timestamp":"2026-09-01T19:39:14.502704","status":409,"error":"Conflict","mensaje":"El veterinario 1 ya tiene un turno el 2027-07-10 a las 10:30","path":"/api/turnos"}
+>>> HTTP 409
+
+### 8 - GET /api/veterinarios/9999 -> 404 (mismo handler, codigo reutilizado)
+{"timestamp":"2026-09-01T19:39:14.511399","status":404,"error":"Not Found","mensaje":"Veterinario con id 9999 no fue encontrado","path":"/api/veterinarios/9999"}
+>>> HTTP 404
+
+=========== CASOS EXTRA: ningun 500 por error del cliente ===========
+
+### matricula formato invalido -> 400
+{"timestamp":"2026-09-01T19:39:14.519125","status":400,"error":"Bad Request","mensaje":"La matricula debe tener el formato MV-1234","path":"/api/veterinarios"}
+>>> HTTP 400
+
+### mascota fechaNacimiento futura -> 400
+{"timestamp":"2026-09-01T19:39:14.526732","status":400,"error":"Bad Request","mensaje":"La fecha de nacimiento no puede ser futura","path":"/api/mascotas"}
+>>> HTTP 400
+
+### turno con mascotaId negativo -> 400 (@Positive)
+{"timestamp":"2026-09-01T19:39:14.534141","status":400,"error":"Bad Request","mensaje":"El id de la mascota debe ser positivo","path":"/api/turnos"}
+>>> HTTP 400
+
+### JSON mal formado -> 400
+{"timestamp":"2026-09-01T19:39:14.541372","status":400,"error":"Bad Request","mensaje":"El cuerpo de la peticion no se pudo leer: JSON mal formado o tipo de dato invalido","path":"/api/duenos"}
+>>> HTTP 400
+
+### PATCH con estado inexistente -> 400
+{"timestamp":"2026-09-01T19:39:14.549258","status":400,"error":"Bad Request","mensaje":"El parametro 'estado' tiene un valor invalido: VOLANDO","path":"/api/turnos/1/estado"}
+>>> HTTP 400
+
+### ruta que no existe -> 404
+{"timestamp":"2026-09-01T19:39:14.557147","status":404,"error":"Not Found","mensaje":"El endpoint solicitado no existe","path":"/api/inexistente"}
+>>> HTTP 404
+
+### verbo no soportado (DELETE turno) -> 405
+{"timestamp":"2026-09-01T19:39:14.564381","status":405,"error":"Method Not Allowed","mensaje":"El metodo DELETE no esta soportado en este endpoint","path":"/api/turnos/1"}
+>>> HTTP 405
+
+### DELETE dueno con turnos agendados -> 409
+{"timestamp":"2026-09-01T19:39:14.610388","status":409,"error":"Conflict","mensaje":"La operacion viola una restriccion de integridad: el recurso esta referenciado por otros registros (por ejemplo, turnos agendados)","path":"/api/duenos/1"}
+>>> HTTP 409
+
+=========== CONTROL: caminos felices intactos ===========
+GET  /duenos            >>> HTTP 200
+GET  /mascotas          >>> HTTP 200
+GET  /veterinarios      >>> HTTP 200
+GET  /turnos            >>> HTTP 200
+GET  /duenos/1/mascotas >>> HTTP 200
+GET  /turnos/agenda     >>> HTTP 200
+PUT  /duenos/1          >>> HTTP 200
+PATCH cancelar turno    >>> HTTP 200
+PUT  /mascotas/1        >>> HTTP 200
+PUT  /veterinarios/1    >>> HTTP 200

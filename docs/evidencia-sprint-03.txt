@@ -1,0 +1,45 @@
+Sprint 3 - CRUD Mascota + relacion con Dueno + JSON circular resuelto
+Ejecutado con la app en localhost:8080 contra MySQL local.
+
+### PASO 1 - Crear dueno -> 201
+{"id":1,"nombre":"Ana","apellido":"Martinez","dni":"30112233","telefono":"1145670000","email":"ana@email.com","mascotas":null}
+>>> HTTP 201
+
+### PASO 2 - Crear mascota para dueno 1 -> 201 (sin campo 'dueno' por JsonBackReference)
+{"id":1,"nombre":"Firulais","especie":"perro","raza":"labrador","fechaNacimiento":"2021-03-15"}
+>>> HTTP 201
+
+### PASO 3 - Segunda mascota -> 201
+{"id":2,"nombre":"Michi","especie":"gato","raza":"siames","fechaNacimiento":"2022-07-20"}
+>>> HTTP 201
+
+### PASO 4 - Endpoint anidado GET /api/duenos/1/mascotas -> 200 con las 2
+[{"id":1,"nombre":"Firulais","especie":"perro","raza":"labrador","fechaNacimiento":"2021-03-15"},{"id":2,"nombre":"Michi","especie":"gato","raza":"siames","fechaNacimiento":"2022-07-20"}]
+>>> HTTP 200
+
+### PASO 5 - Mascota con dueno inexistente -> 404
+Dueno con id 999 no fue encontrado
+>>> HTTP 404
+
+### PASO 6 - GET dueno 1: incluye mascotas SIN bucle infinito -> 200
+{"id":1,"nombre":"Ana","apellido":"Martinez","dni":"30112233","telefono":"1145670000","email":"ana@email.com","mascotas":[{"id":1,"nombre":"Firulais","especie":"perro","raza":"labrador","fechaNacimiento":"2021-03-15"},{"id":2,"nombre":"Michi","especie":"gato","raza":"siames","fechaNacimiento":"2022-07-20"}]}
+>>> HTTP 200
+
+### EXTRA - Nombre duplicado para el mismo dueno -> 409
+El dueno 1 ya tiene una mascota llamada Firulais
+>>> HTTP 409
+
+### EXTRA - Anidado con dueno inexistente -> 404
+Dueno con id 999 no fue encontrado
+>>> HTTP 404
+
+### EXTRA - PUT mascota -> 200
+{"id":1,"nombre":"Firulais","especie":"perro","raza":"golden retriever","fechaNacimiento":"2021-03-15"}
+>>> HTTP 200
+
+### EXTRA - DELETE mascota -> 204, y de nuevo -> 404
+>>> HTTP 204
+>>> HTTP 404
+
+### GET /api/mascotas -> tamano de la respuesta (control anti-bucle)
+>>> HTTP 200 bytes=105
