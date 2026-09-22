@@ -11,7 +11,7 @@ Sistema de gestión de una clínica veterinaria, construido sprint a sprint desd
 - [Nombre Apellido 1] — TODO
 - [Nombre Apellido 2] — TODO
 
-## Sprint actual: Sprint 6 — Testing: JUnit 5 + Mockito + MockMvc
+## Sprint actual: Sprint 7 — Swagger + frontend + análisis del monolito (cierre Fase 1)
 
 API REST completa de la clínica: CRUD de Dueño, Mascota, Veterinario y Turno, con DTOs,
 validación de entrada y respuestas de error uniformes.
@@ -28,12 +28,14 @@ validación de entrada y respuestas de error uniformes.
 | 4 | `sprint-04` | DTOs + MapStruct + CRUD Turno y Veterinario |
 | 5 | `sprint-05` | Bean Validation + `@ControllerAdvice` |
 | 6 | `sprint-06` | Tests: JUnit 5 + Mockito + MockMvc (`./mvnw test`) |
+| 7 | `sprint-07` | Swagger UI + CORS + frontend Bootstrap + [análisis del monolito](docs/analisis-monolito.md) |
 
 ## Stack
 
 - Java 21 · Spring Boot 4.1.0
 - Spring Web, Spring Data JPA (Hibernate 7), Bean Validation, Lombok, DevTools
 - MapStruct 1.5.5.Final (mappers entidad ↔ DTO generados en compilación)
+- springdoc-openapi 3.1.1 (Swagger UI) · Bootstrap 5.3.3 + Fetch API en el frontend
 - MySQL — verificado contra 9.7.1 (la fórmula `mysql` de Homebrew). El dialecto lo
   autodetecta Hibernate, así que 8.x también funciona sin cambiar nada.
 
@@ -109,6 +111,17 @@ versión correcta de Maven la primera vez.
    La salida real de esta verificación está guardada en
    [`docs/evidencia-sprint-01.txt`](docs/evidencia-sprint-01.txt).
 
+## Documentación y frontend
+
+- **Swagger UI:** <http://localhost:8080/swagger-ui.html> (especificación OpenAPI en `/v3/api-docs`)
+- **Frontend:** con el backend corriendo,
+
+  ```bash
+  cd frontend && python3 -m http.server 5500
+  ```
+
+  y abrir <http://localhost:5500>. Lista los dueños y permite dar de alta uno nuevo.
+
 ## Modelo de dominio
 
 Ver [`docs/diagrama-clases.md`](docs/diagrama-clases.md) para el diagrama de clases y las
@@ -124,6 +137,7 @@ src/main/java/com/vetSystem/vet_system/
 ├── repository/     DuenoRepository · MascotaRepository · VeterinarioRepository · TurnoRepository
 ├── dto/            DuenoDTO · MascotaDTO · VeterinarioDTO · TurnoRequestDTO · TurnoResponseDTO
 ├── mapper/         DuenoMapper · MascotaMapper · VeterinarioMapper · TurnoMapper  (MapStruct)
+├── config/        SwaggerConfig · WebConfig (CORS)
 ├── exception/      ResourceNotFoundException · DuplicateResourceException
 │                   TurnoSuperpuestoException · ErrorResponse · GlobalExceptionHandler
 └── model/          Dueno · Mascota · Veterinario · Turno · EstadoTurno  (entidades JPA)
@@ -214,6 +228,11 @@ Salida real de las pruebas de cada sprint:
 
 ## Definition of Done
 
+**Sprint 7** — springdoc + `/swagger-ui.html` · `@Tag`/`@Operation`/`@ApiResponse` en
+`DuenoController` y `TurnoController` · `@Schema` en `DuenoDTO` y `TurnoRequestDTO` · CORS ·
+`frontend/index.html` (GET + POST + errores en pantalla) · `docs/analisis-monolito.md` ·
+13 tests siguen verdes. ✅
+
 **Sprint 6** — `DuenoServiceTest` (6) · `TurnoServiceTest` (2) · `DuenoControllerTest` (5) ·
 patrón AAA · `verify(never())` en los casos de error · sin `@SpringBootTest` ·
 `./mvnw test` → BUILD SUCCESS con 13 tests. ✅
@@ -239,9 +258,12 @@ por Hibernate. ✅
 
 **Pendiente en todos los sprints:** push de las ramas a GitHub y PR hacia `main`.
 
-## Próximo sprint (Sprint 6)
+## Próximo: Fase 2 — Microservicios
 
-- Testing: JUnit 5 + Mockito para tests unitarios de Services
-- MockMvc para tests de integración de Controllers
-- Patrón Arrange-Act-Assert (AAA)
-- Criterios de cobertura: qué vale la pena testear y qué no
+- Sprint 8: Parcial 1
+- Sprint 9: Arquitectura Hexagonal
+- Sprint 10: Eureka + Config Server
+- Sprint 11: API Gateway + Resilience4J
+- Sprint 12: Spring Security + JWT
+- Sprint 13: OpenFeign
+- Sprint 14: Redis + MongoDB + Docker Compose

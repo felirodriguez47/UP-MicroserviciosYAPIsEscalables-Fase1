@@ -1,7 +1,7 @@
 # Guía de estudio por sprint — vet-system
 
 Universidad de Palermo · Microservicios y APIs Escalables · 2026
-Clínica Veterinaria "Patitas Felices" · Fase 1: Monolito MVC
+Clínica Veterinaria "Patitas Felices" · Fase 1: Monolito MVC (Sprints 1–7)
 
 Esta guía es para **estudiar antes del oral**. Cada sprint tiene: qué se construyó, qué
 concepto hay que poder defender, dónde está en el código, y las preguntas que probablemente
@@ -19,6 +19,7 @@ te hagan.
 | 4 | `sprint-04` | DTOs + MapStruct + Turno/Veterinario | La entidad JPA no debe ser el contrato de la API |
 | 5 | `sprint-05` | Validaciones + errores globales | 4xx es error del cliente, 5xx del servidor. Nunca confundirlos |
 | 6 | `sprint-06` | Testing: JUnit 5 + Mockito + MockMvc | Un test que no falla cuando rompés el código no sirve |
+| 7 | `sprint-07` | Swagger + frontend + análisis del monolito | El monolito está bien hecho; saber cuándo deja de alcanzar |
 
 Cada rama sale de la anterior, porque cada sprint refactoriza lo del previo.
 Para ver la evolución de un archivo: `git log -p --follow <archivo>`.
@@ -475,6 +476,161 @@ Un test que siempre pasa no protege nada. Se hicieron las tres verificaciones de
 4. *¿Cómo sabés que un test sirve?* Rompiendo el código a propósito y viendo que falla.
 5. *¿Por qué `verifyNoInteractions(duenoService)` en el test del 400?* Prueba el *fast fail*:
    `@Valid` rechazó la petición antes de llegar al Service.
+
+---
+
+# Sprint 7 — Swagger + frontend Bootstrap + análisis del monolito
+
+## Qué se construyó
+Cierre de la Fase 1:
+- **Swagger UI** en `/swagger-ui.html` con los 4 recursos agrupados y `DuenoController` y
+  `TurnoController` documentados endpoint por endpoint
+- `@Schema` con ejemplos reales en `DuenoDTO` y `TurnoRequestDTO`
+- **CORS** configurado en `config/WebConfig.java`
+- **Frontend** `frontend/index.html`: Bootstrap 5 + JavaScript puro, lista dueños y da de alta
+- **`docs/analisis-monolito.md`**: los 5 pain points del monolito y el costo de migrar
+
+```bash
+./mvnw spring-boot:run                       # backend en :8080
+cd frontend && python3 -m http.server 5500   # frontend en :5500
+# Swagger:  http://localhost:8080/swagger-ui.html
+# Frontend: http://localhost:5500
+```
+
+## Lo que tenés que entender
+
+**OpenAPI vs Swagger vs springdoc** — tres cosas distintas:
+
+| | Qué es |
+|---|---|
+| **OpenAPI 3** | El **estándar**: un JSON/YAML que describe endpoints, parámetros, respuestas y modelos |
+| **Swagger UI** | La **interfaz web** que lee ese JSON y genera documentación interactiva ("Try it out") |
+| **springdoc-openapi** | La **librería** que genera el JSON leyendo los `@RestController` de Spring |
+
+El JSON generado está en `/v3/api-docs`. Swagger UI es solo una forma de mostrarlo. Con ese
+mismo JSON se pueden generar clientes, importarlo en Postman, o validar contratos entre equipos.
+
+**Code-first vs design-first:** acá la documentación se genera **desde el código**
+(code-first), así que no puede quedar desactualizada respecto de los endpoints. La
+alternativa es escribir primero el contrato OpenAPI y generar el código a partir de él.
+
+| Anotación | Dónde | Qué documenta |
+|---|---|---|
+| `@Tag` | Clase Controller | Agrupa los endpoints bajo un nombre |
+| `@Operation` | Método | `summary` (una línea) y `description` |
+| `@ApiResponse(s)` | Método | Cada código HTTP posible y su significado |
+| `@Parameter` | `@PathVariable` / `@RequestParam` | Descripción y ejemplo |
+| `@Schema` | Campo de DTO | Descripción, ejemplo, si es solo lectura |
+
+Estas anotaciones **no cambian el comportamiento**: son metadatos. Los endpoints aparecen en
+Swagger aunque no tengan ninguna; las anotaciones agregan descripciones y ejemplos.
+
+**`@ApiResponse` con `schema = ErrorResponse.class`** — documenta que un 404 o 409 devuelve
+el `ErrorResponse` del Sprint 5, así el frontend sabe qué campo leer (`mensaje`).
+
+**CORS (Cross-Origin Resource Sharing)** — política **del navegador**, no del servidor.
+- **Origen** = esquema + host + puerto. `http://localhost:5500` y `http://localhost:8080` son
+  **orígenes distintos** (cambia el puerto).
+- Por la *Same-Origin Policy*, el navegador no deja que el JavaScript de un origen lea
+  respuestas de otro, salvo que el servidor lo autorice con `Access-Control-Allow-Origin`.
+- **Preflight:** para un `POST` con `Content-Type: application/json`, el navegador manda
+  primero un `OPTIONS` preguntando si puede. Recién si la respuesta lo permite, manda el POST.
+- **Postman no tiene este problema** porque no es un navegador: no aplica la política.
+
+**CORS no es un mecanismo de seguridad del servidor.** No impide que curl o un script llamen
+a la API. Lo que protege es al **usuario del navegador**: evita que un sitio malicioso use su
+navegador para leer datos de otra API. Por eso `allowedOrigins("*")` es aceptable solo en
+desarrollo; en producción se listan los orígenes exactos del frontend.
+
+**Fetch API** — `fetch()` devuelve una *Promise*. Detalle que confunde siempre:
+
+| Situación | ¿La Promise se rechaza? |
+|---|---|
+| Backend apagado, CORS bloqueado, sin red | **Sí** (`TypeError: Failed to fetch`) |
+| El servidor responde 400, 404, 500 | **No** — llega como respuesta "exitosa" |
+
+Por eso el frontend chequea `response.ok` (true solo para 2xx) y, si es false, lee el
+`ErrorResponse` y muestra `mensaje` en pantalla.
+
+`async`/`await` es la forma legible de encadenar Promises. `evento.preventDefault()` evita que
+el `<form>` recargue la página.
+
+## Decisiones de seguridad en el frontend
+
+| Decisión | Por qué |
+|---|---|
+| Datos renderizados con **`textContent`**, nunca `innerHTML` | Evita **XSS almacenado**. Se probó: un dueño llamado `<img src=x onerror=alert(1)>` se guarda y se muestra como texto; la tabla tiene 0 elementos `<img>` |
+| **SRI** (`integrity="sha384-..."`) en el CSS y JS de Bootstrap | Si el CDN sirve un archivo modificado, el navegador lo rechaza. Los hashes se calcularon a partir de los archivos reales |
+| Form con `novalidate` | Se deja validar a la API (Sprint 5) para mostrar sus mensajes. La validación del navegador es comodidad, **nunca** seguridad: cualquiera la saltea con curl |
+
+## El análisis del monolito (lo más importante para el parcial)
+
+El monolito **no está mal**. Para la clínica de hoy es la arquitectura correcta: un solo deploy,
+transacciones ACID, joins directos y debugging simple. El análisis identifica **cuándo deja de
+alcanzar**:
+
+| Pain point | Ejemplo en vet-system | Fase 2 |
+|---|---|---|
+| Escalabilidad acoplada | Para escalar Turnos hay que replicar todo el `.jar`, y la base sigue siendo una | MS de Turnos escalado aparte |
+| Falla total | Un bug en Veterinarios agota hilos o conexiones del pool, o tira la JVM | Procesos separados + Resilience4J |
+| Base y tecnología únicas | Las FKs cruzadas impiden pasar el historial a MongoDB | Una base por servicio |
+| Equipos acoplados | `TurnoService` inyecta `MascotaRepository`; todos editan el mismo `pom.xml` | Contratos OpenAPI entre equipos |
+| Deploy monolítico | Cambiar Mascotas reinicia el sistema entero | Deploy independiente con Docker |
+
+**Y el costo de migrar:** latencia de red, fallos parciales, pérdida de transacciones entre
+servicios (consistencia eventual, patrón Saga), más infraestructura y observabilidad
+distribuida. *"Una migración sin justificación técnica es complejidad gratuita"* (el profe).
+
+**Strangler Fig Pattern:** se migra de a un módulo. El Gateway empieza a enrutar, por ejemplo,
+`/api/turnos` al nuevo microservicio mientras el monolito sigue atendiendo el resto, hasta que
+el monolito queda vacío. Evita la reescritura "big bang".
+
+## Diferencias con el doc (Spring Boot 4)
+
+| Doc | Realidad |
+|---|---|
+| "Buscar la versión más reciente de springdoc" | La búsqueda de Maven Central devuelve **2.8.x**, que es la línea para **Boot 3**. Para Boot 4 va la **3.x** (`3.1.1`) |
+| `/swagger-ui.html` | Responde 302 y redirige a `/swagger-ui/index.html`. Es el comportamiento normal |
+
+## Decisiones YAGNI
+- `@Operation`/`@ApiResponse` completos solo en `DuenoController` y `TurnoController` (lo que
+  pide el DoD). Mascota y Veterinario llevan solo `@Tag` para quedar agrupados; sus endpoints
+  igual aparecen en Swagger.
+- `@Schema` en `DuenoDTO` y `TurnoRequestDTO` (DoD). No se agregó en `VeterinarioDTO`.
+- CORS solo sobre `/api/**`: Swagger se sirve desde el mismo origen y no lo necesita.
+
+## Cómo se verificó
+- `./mvnw test` → 13/13 verdes (el Sprint 7 no rompió ningún test)
+- `/swagger-ui.html` → 302 → UI con los 4 grupos · `/v3/api-docs` → 200, 11 paths
+- `POST /api/duenos` documentado con `201`, `400`, `409`; `DuenoDTO.dni` con ejemplo `28543210`
+- CORS: `Access-Control-Allow-Origin: *` en el GET y en el preflight `OPTIONS` del POST
+- Frontend en el navegador: tabla carga sin error de CORS · email inválido muestra
+  *"El email no tiene un formato valido"* en el modal · alta válida cierra el modal y agrega la
+  fila sin recargar · el payload XSS se muestra como texto
+
+## Dónde mirarlo
+- `config/SwaggerConfig.java` y `config/WebConfig.java`
+- `controller/DuenoController.java`, `controller/TurnoController.java` — anotaciones OpenAPI
+- `dto/DuenoDTO.java`, `dto/TurnoRequestDTO.java` — `@Schema`
+- `frontend/index.html`
+- `docs/analisis-monolito.md`
+
+## Preguntas probables
+1. *¿Por qué el frontend no podía llamar al backend sin configurar nada?* Orígenes distintos
+   (cambia el puerto) → el navegador bloquea por Same-Origin Policy hasta que el servidor
+   responda `Access-Control-Allow-Origin`.
+2. *¿Por qué Postman sí funcionaba?* CORS lo aplica el navegador; Postman no es un navegador.
+3. *¿CORS protege la API?* No. Protege al usuario del navegador. La API se protege con
+   autenticación (JWT, Sprint 12).
+4. *¿Por qué `textContent` y no `innerHTML`?* `innerHTML` interpreta HTML → XSS si un dato
+   contiene `<script>` o un `onerror`.
+5. *¿Un 404 hace que `fetch` falle?* No: solo falla ante errores de red. Hay que mirar
+   `response.ok`.
+6. *¿Por qué migrar si el monolito funciona?* No se migra porque sí: se migra cuando aparecen
+   carga desigual, necesidad de persistencia distinta por módulo o varios equipos. Y se
+   asume el costo (red, consistencia eventual, infraestructura).
+7. *¿Qué es el Strangler Fig Pattern?* Migración gradual: el Gateway desvía de a un módulo
+   hacia el nuevo servicio mientras el monolito sigue atendiendo el resto.
 
 ---
 

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Patitas Felices — Dueños</title>
+    <!-- Bootstrap 5 desde CDN. integrity (SRI) hace que el navegador rechace el
+         archivo si el CDN lo sirve modificado. -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-success mb-4">
+    <div class="container">
+        <span class="navbar-brand">🐾 Clínica Veterinaria Patitas Felices</span>
+    </div>
+</nav>
+
+<main class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0">Dueños</h1>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalDueno">Nuevo dueño</button>
+    </div>
+
+    <div id="errorLista" class="alert alert-danger d-none"></div>
+
+    <table class="table table-striped bg-white shadow-sm">
+        <thead>
+        <tr><th>ID</th><th>Nombre</th><th>Apellido</th><th>DNI</th><th>Teléfono</th><th>Email</th></tr>
+        </thead>
+        <tbody id="tablaDuenos"></tbody>
+    </table>
+</main>
+
+<div class="modal fade" id="modalDueno" tabindex="-1" aria-labelledby="tituloModal" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="formDueno" class="modal-content" novalidate>
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="tituloModal">Nuevo dueño</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <!-- novalidate en el form: dejamos que valide la API, para ver sus
+                     mensajes de error (Sprint 5) en pantalla. -->
+                <div class="mb-2"><label class="form-label" for="nombre">Nombre</label>
+                    <input class="form-control" id="nombre" name="nombre"></div>
+                <div class="mb-2"><label class="form-label" for="apellido">Apellido</label>
+                    <input class="form-control" id="apellido" name="apellido"></div>
+                <div class="mb-2"><label class="form-label" for="dni">DNI</label>
+                    <input class="form-control" id="dni" name="dni"></div>
+                <div class="mb-2"><label class="form-label" for="telefono">Teléfono</label>
+                    <input class="form-control" id="telefono" name="telefono"></div>
+                <div class="mb-2"><label class="form-label" for="email">Email</label>
+                    <input class="form-control" id="email" name="email" type="email"></div>
+                <div id="errorForm" class="alert alert-danger d-none mt-3 mb-0" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-success">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script>
+    const API = 'http://localhost:8080/api/duenos';
+
+    const tabla = document.getElementById('tablaDuenos');
+    const errorLista = document.getElementById('errorLista');
+    const form = document.getElementById('formDueno');
+    const errorForm = document.getElementById('errorForm');
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDueno'));
+
+    function mostrarError(elemento, mensaje) {
+        elemento.textContent = mensaje;
+        elemento.classList.remove('d-none');
+    }
+
+    // fetch solo rechaza la Promise ante un fallo de RED. Un 404 o un 500 llegan
+    // como respuesta "exitosa": hay que mirar response.ok a mano.
+    async function leerError(response) {
+        try {
+            const body = await response.json();   // ErrorResponse del backend
+            return body.mensaje || `Error HTTP ${response.status}`;
+        } catch {
+            return `Error HTTP ${response.status}`;
+        }
+    }
+
+    async function cargarDuenos() {
+        errorLista.classList.add('d-none');
+        try {
+            const response = await fetch(API);
+            if (!response.ok) throw new Error(await leerError(response));
+            const duenos = await response.json();
+
+            tabla.replaceChildren();
+            for (const d of duenos) {
+                const fila = tabla.insertRow();
+                // textContent y NO innerHTML: si un dueño se llamara
+                // <img src=x onerror=alert(1)>, innerHTML lo ejecutaria (XSS).
+                for (const valor of [d.id, d.nombre, d.apellido, d.dni, d.telefono ?? '', d.email]) {
+                    fila.insertCell().textContent = valor;
+                }
+            }
+        } catch (e) {
+            // TypeError "Failed to fetch" = backend apagado o CORS bloqueado.
+            mostrarError(errorLista, `No se pudo cargar la lista: ${e.message}`);
+        }
+    }
+
+    form.addEventListener('submit', async (evento) => {
+        evento.preventDefault();          // evita que el form recargue la pagina
+        errorForm.classList.add('d-none');
+
+        const dueno = Object.fromEntries(new FormData(form));
+        try {
+            const response = await fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dueno)
+            });
+            if (!response.ok) throw new Error(await leerError(response));
+
+            form.reset();
+            modal.hide();
+            await cargarDuenos();         // la tabla se actualiza sin recargar
+        } catch (e) {
+            mostrarError(errorForm, e.message);
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', cargarDuenos);
+</script>
+</body>
+</html>

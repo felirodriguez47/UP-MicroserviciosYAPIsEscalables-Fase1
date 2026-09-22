@@ -2,6 +2,7 @@ package com.vetSystem.vet_system.controller;
 
 import com.vetSystem.vet_system.dto.VeterinarioDTO;
 import com.vetSystem.vet_system.service.VeterinarioService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Veterinarios", description = "Profesionales de la clínica")
 @RestController
 @RequestMapping("/api/veterinarios")
 @RequiredArgsConstructor
