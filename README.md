@@ -6,11 +6,6 @@ Ing. Jorge Agustín Pereyra
 Sistema de gestión de una clínica veterinaria, construido sprint a sprint desde un monolito MVC
 (Fase 1) hasta una arquitectura de microservicios completa (Fase 2).
 
-## Integrantes
-
-- [Nombre Apellido 1] — TODO
-- [Nombre Apellido 2] — TODO
-
 ## Sprint actual: Sprint 7 — Swagger + frontend + análisis del monolito (cierre Fase 1)
 
 API REST completa de la clínica: CRUD de Dueño, Mascota, Veterinario y Turno, con DTOs,
@@ -267,3 +262,25 @@ por Hibernate. ✅
 - Sprint 12: Spring Security + JWT
 - Sprint 13: OpenFeign
 - Sprint 14: Redis + MongoDB + Docker Compose
+
+## Parcial 1 — Decisiones de diseño
+
+### Relación Turno–Medicamento
+
+Elegí una entidad intermedia, `TurnoMedicamento`, en lugar de un `@ManyToMany`. Un `@ManyToMany` genera una tabla de unión que solo guarda los dos IDs, y yo necesitaba guardar un dato propio de la receta: el precio del medicamento en el momento en que se recetó. Así, si mañana cambia el `precioUnitario` del medicamento, lo que ya se vendió en un turno no se modifica, que es como funciona cualquier comprobante de venta. La tabla `turno_medicamentos` tiene dos `@ManyToOne` obligatorios (hacia `turnos` y hacia `medicamentos`) y una restricción `UNIQUE (turno_id, medicamento_id)`, porque en la clínica no tiene sentido recetar dos veces el mismo medicamento en un mismo turno. La relación es unidireccional: `Turno` no tiene una lista de medicamentos, y la consulta se hace con `findByTurnoId` en el repositorio, así no toqué la entidad `Turno` ni corro riesgo de serialización circular. Como las FKs protegen el historial, un medicamento que ya fue recetado no se puede borrar y la API responde 409. El esquema lo genera Hibernate con `spring.jpa.hibernate.ddl-auto=update`, que para este trabajo alcanza porque solo agrega tablas y columnas nuevas y nunca borra datos existentes; en producción usaría migraciones versionadas con Flyway o Liquibase, porque `update` no permite revisar ni revertir los cambios.
+
+### Validación de stock
+
+El control está en la capa de servicio, en `TurnoMedicamentoService.recetarMedicamento`. Antes de tocar el stock valido, en este orden, que exista el turno y el medicamento (404) y que ese medicamento no esté ya recetado en ese turno (409), para que un pedido inválido nunca descuente una unidad. Para el stock no leo el valor y después lo guardo restado, porque esos dos pasos separados permiten que dos pedidos simultáneos con una sola unidad pasen la validación y dejen el stock en -1. En cambio, uso una sola sentencia en el repositorio: `UPDATE Medicamento m SET m.stock = m.stock - 1 WHERE m.id = :id AND m.stock > 0`, que valida y descuenta de forma atómica en la base. El método devuelve la cantidad de filas modificadas: si es 0, no había stock y lanzo `StockInsuficienteException`, que el `GlobalExceptionHandler` convierte en un 422 con el `ErrorResponse` estándar. Lo probé mandando dos pedidos al mismo tiempo sobre un medicamento con stock 1: uno recibió 201, el otro 422, y el stock quedó en 0. Usé 422 y no 400 porque el pedido está bien formado, y no 409 porque no choca con otro registro: lo que falla es una regla de negocio.
+
+### Solapamiento
+
+La validación está en `TurnoService.createTurno`, después de comprobar que existen la mascota y el veterinario, para que un ID inexistente dé 404 y no un falso 409. La consulta es `findFirstByVeterinarioIdAndFechaAndHoraAndEstadoNot`, que compara el mismo veterinario, la misma fecha y la misma hora exacta del turno pedido. Usé un `findFirst` que devuelve el turno, y no un `exists` que devuelve true o false, porque la consigna pide informar cuál es el turno en conflicto: el mensaje del 409 incluye su ID, su fecha y su hora. Además excluyo los turnos en estado `CANCELADO`, porque si no, un turno cancelado dejaría ese horario bloqueado para siempre aunque el veterinario esté libre. Una limitación conocida es que el algoritmo compara la hora exacta y no una duración, así que un turno a las 10:30 y otro a las 10:45 no se detectan como superpuestos. Para resolverlo haría falta agregar la duración del turno y buscar por rango de horario.
+
+### Cupo de mascotas
+
+La validación está en `MascotaService.createMascota` y usa `countByDuenoId`, que genera un `SELECT COUNT(*) FROM mascotas WHERE dueno_id = ?` sin cargar las mascotas en memoria. Si el dueño ya tiene 5, lanzo `CupoMascotasExcedidoException` y el handler responde 422, compartiendo el manejo con la falta de stock porque en los dos casos los datos son válidos pero rompen una regla de negocio. Como criterio de "mascota activa" tomé todas las mascotas registradas del dueño. Es coherente con el modelo actual: el DELETE de mascotas es físico, así que una mascota que ya no está en la clínica se borra, y una mascota con turnos no se puede borrar porque la FK de `turnos` lo impide. La limitación de este criterio es que una mascota que falleció pero tiene historial de turnos sigue ocupando un lugar del cupo para siempre, porque no hay forma de darla de baja sin perder ese historial. La solución sería una baja lógica con un campo `activa` en `Mascota`, pero la consigna pedía no modificar el modelo, así que la dejo documentada como mejora. Otra limitación es que el conteo y el alta son dos pasos, por lo que dos altas simultáneas con 4 mascotas cargadas podrían terminar en 6; se resolvería bloqueando la fila del dueño durante la validación.
+
+### Decisión más difícil
+
+Lo más difícil fue el descuento de stock, porque la forma obvia de hacerlo tiene un error que no se ve probando de a un pedido. La primera idea era buscar el medicamento, preguntar si el stock es mayor a 0 y guardarlo con una unidad menos. Eso funciona siempre que los pedidos lleguen de a uno, pero entre la lectura y el guardado otro pedido puede leer el mismo stock y los dos lo descuentan. Lo resolví moviendo la condición adentro del `UPDATE`, para que la base haga la validación y el descuento en una sola operación atómica, y usando la cantidad de filas modificadas para saber si había stock. También tuve que pensar el orden de las validaciones, para que un pedido duplicado o con IDs inexistentes falle antes de tocar el stock. Lo verifiqué enviando dos pedidos simultáneos por la última unidad y confirmando que solo uno se concreta y que el stock nunca queda negativo.
