@@ -83,6 +83,12 @@ public class GlobalExceptionHandler {
         return construir(HttpStatus.CONFLICT, ex.getMessage(), req);
     }
 
+    @ExceptionHandler(StockInsuficienteException.class)
+    public ResponseEntity<ErrorResponse> handleStockInsuficiente(StockInsuficienteException ex,
+                                                                 HttpServletRequest req) {
+        return construir(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), req);
+    }
+
     /** Ruta que no existe (ej: GET /api/inexistente) -> 404, no 500. */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleRutaInexistente(NoResourceFoundException ex,

@@ -1,9 +1,11 @@
 package com.vetSystem.vet_system.controller;
 
+import com.vetSystem.vet_system.dto.MedicamentoRecetadoDTO;
 import com.vetSystem.vet_system.dto.TurnoRequestDTO;
 import com.vetSystem.vet_system.dto.TurnoResponseDTO;
 import com.vetSystem.vet_system.exception.ErrorResponse;
 import com.vetSystem.vet_system.model.EstadoTurno;
+import com.vetSystem.vet_system.service.TurnoMedicamentoService;
 import com.vetSystem.vet_system.service.TurnoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +31,7 @@ import java.util.List;
 public class TurnoController {
 
     private final TurnoService turnoService;
+    private final TurnoMedicamentoService turnoMedicamentoService;
 
     @Operation(summary = "Listar todos los turnos")
     @ApiResponse(responseCode = "200", description = "Lista de turnos")
@@ -97,5 +100,36 @@ public class TurnoController {
             @Parameter(description = "Notas de la consulta", example = "Control sin novedades")
             @RequestParam(required = false) String observaciones) {
         return ResponseEntity.ok(turnoService.actualizarEstado(id, estado, observaciones));
+    }
+
+    @Operation(summary = "Medicamentos recetados en un turno")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Medicamentos del turno (puede estar vacía)"),
+            @ApiResponse(responseCode = "404", description = "No existe un turno con ese ID",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @GetMapping("/{id}/medicamentos")
+    public ResponseEntity<List<MedicamentoRecetadoDTO>> getMedicamentos(
+            @Parameter(description = "ID del turno", example = "1") @PathVariable Long id) {
+        return ResponseEntity.ok(turnoMedicamentoService.getMedicamentosDeTurno(id));
+    }
+
+    @Operation(summary = "Recetar un medicamento en un turno",
+            description = "Descuenta 1 unidad del stock y guarda el precio vigente al momento de recetar.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Medicamento recetado"),
+            @ApiResponse(responseCode = "404", description = "El turno o el medicamento no existen",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "El medicamento ya está recetado en ese turno",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "422", description = "El medicamento no tiene stock",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PostMapping("/{turnoId}/medicamentos/{medicamentoId}")
+    public ResponseEntity<MedicamentoRecetadoDTO> recetarMedicamento(
+            @Parameter(description = "ID del turno", example = "1") @PathVariable Long turnoId,
+            @Parameter(description = "ID del medicamento", example = "1") @PathVariable Long medicamentoId) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(turnoMedicamentoService.recetarMedicamento(turnoId, medicamentoId));
     }
 }
