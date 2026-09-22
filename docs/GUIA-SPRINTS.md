@@ -18,6 +18,7 @@ te hagan.
 | 3 | `sprint-03` | Relaciones + CRUD Mascota | Las relaciones bidireccionales generan JSON circular |
 | 4 | `sprint-04` | DTOs + MapStruct + Turno/Veterinario | La entidad JPA no debe ser el contrato de la API |
 | 5 | `sprint-05` | Validaciones + errores globales | 4xx es error del cliente, 5xx del servidor. Nunca confundirlos |
+| 6 | `sprint-06` | Testing: JUnit 5 + Mockito + MockMvc | Un test que no falla cuando rompés el código no sirve |
 
 Cada rama sale de la anterior, porque cada sprint refactoriza lo del previo.
 Para ver la evolución de un archivo: `git log -p --follow <archivo>`.
@@ -357,6 +358,126 @@ historial clínico de sus mascotas.
 
 ---
 
+# Sprint 6 — Testing: JUnit 5 + Mockito + MockMvc
+
+## Qué se construyó
+13 tests automatizados (el mínimo del DoD era 11), sin servidor ni base de datos:
+- `DuenoServiceTest` — 6 tests unitarios
+- `TurnoServiceTest` — 2 tests unitarios (camino feliz + superposición)
+- `DuenoControllerTest` — 5 tests de la capa web con MockMvc
+
+```bash
+./mvnw test                                    # todos
+./mvnw test -Dtest=DuenoServiceTest            # una clase
+./mvnw test -Dsurefire.runOrder=random         # orden aleatorio
+```
+
+## Lo que tenés que entender
+
+**Cada herramienta tiene su rol (se usan juntas, no son alternativas):**
+
+| Herramienta | Rol |
+|---|---|
+| JUnit 5 | Descubre y ejecuta los tests, reporta verde/rojo |
+| Mockito | Crea **mocks**: objetos simulados que reemplazan dependencias reales |
+| AssertJ | Aserciones legibles: `assertThat(x).isEqualTo(y)` |
+| MockMvc | Simula peticiones HTTP sin levantar Tomcat |
+
+**Test unitario vs test de integración:**
+
+| | Unitario (`DuenoServiceTest`) | Integración web (`DuenoControllerTest`) |
+|---|---|---|
+| Qué prueba | Una clase aislada | Controller + JSON + validación + handler de errores |
+| ¿Levanta Spring? | **No** | Solo la capa web |
+| Anotación | `@ExtendWith(MockitoExtension.class)` | `@WebMvcTest(DuenoController.class)` |
+| Dependencias | `@Mock` | `@MockitoBean` |
+| Velocidad | Milisegundos | ~1 segundo |
+
+**Patrón Arrange–Act–Assert (AAA):** todo test tiene tres partes, marcadas con comentarios.
+1. **Arrange:** preparar datos y definir qué devuelven los mocks (`when(...).thenReturn(...)`)
+2. **Act:** llamar al método que se prueba
+3. **Assert:** verificar el resultado (`assertThat`) y las interacciones (`verify`)
+
+**Mockito en cinco líneas:**
+
+| Código | Qué hace |
+|---|---|
+| `@Mock DuenoRepository repo` | Crea un repositorio falso |
+| `@InjectMocks DuenoService service` | Crea el Service real y le inyecta los mocks por constructor |
+| `when(repo.findById(1L)).thenReturn(Optional.of(d))` | "Si te llaman así, devolvé esto" |
+| `verify(repo, never()).save(any())` | Verifica que `save` **nunca** se llamó |
+| `verifyNoInteractions(service)` | El mock no fue tocado en absoluto |
+
+**Por qué `verify(repo, never()).save(any())` es lo más importante del test de DNI duplicado:**
+`assertThrows` solo prueba que salió una excepción. `never().save()` prueba que **la base no
+se modificó**. Un test que solo mira la excepción no detectaría un código que guarda y
+después lanza el error.
+
+**`ArgumentCaptor`** (en `TurnoServiceTest`) captura el objeto que el Service le pasó a
+`save()`, para verificar que el turno se armó con `estado = PENDIENTE`. Sirve para probar
+objetos que el Service crea adentro y el test no ve.
+
+**Convención de nombres** `metodo_condicion_resultadoEsperado`:
+`createDueno_cuandoDniDuplicado_lanzaDuplicateResourceExceptionYNoGuarda`. Leyendo solo el
+nombre se sabe qué comportamiento documenta. Un test es documentación que no puede quedar
+desactualizada: si miente, falla.
+
+**Mockito en modo estricto:** `MockitoExtension` falla con `UnnecessaryStubbing` si un
+`when(...)` nunca se usa. Obliga a que cada test configure solo lo que necesita.
+
+## Diferencias con el doc (Spring Boot 4)
+
+El doc está escrito para Spring Boot 3. Dos cosas cambian:
+
+| Doc | Spring Boot 4 | Por qué |
+|---|---|---|
+| `@MockBean` | **`@MockitoBean`** (`org.springframework.test.context.bean.override.mockito`) | `@MockBean` se deprecó en Boot 3.4 y **se eliminó en Boot 4** |
+| `@WebMvcTest` viene con `spring-boot-starter-test` | Hay que agregar **`spring-boot-starter-webmvc-test`** | Boot 4 separó los test slices en módulos propios |
+| Paquete `org.springframework.boot.test.autoconfigure.web.servlet` | `org.springframework.boot.webmvc.test.autoconfigure` | Mismo cambio de modularización |
+
+Tampoco existe `VetSystemApplicationTests` (el test de contexto por defecto): usaría
+`@SpringBootTest`, que conecta a MySQL, y el DoD lo prohíbe.
+
+## Cómo se comprobó que los tests son reales
+
+Un test que siempre pasa no protege nada. Se hicieron las tres verificaciones del doc:
+
+| Verificación | Resultado |
+|---|---|
+| **Romper el código a propósito:** desactivar la validación del DNI en `DuenoService` | `createDueno_cuandoDniDuplicado` **falla** (`expected DuplicateResourceException but was NullPointerException`). Se restauró el código |
+| **Orden aleatorio** (`-Dsurefire.runOrder=random`) | 13/13 verdes: los tests no dependen entre sí |
+| **URL de MySQL inválida** (`-Dspring.datasource.url=jdbc:mysql://host-que-no-existe:1/x`) | 13/13 verdes: ningún test toca la base |
+
+## Qué vale la pena testear
+
+| Sí | No |
+|---|---|
+| Reglas de negocio (DNI duplicado, superposición) | Getters/setters de Lombok |
+| El camino **no feliz**: 404, 409, 400 | Mappers generados por MapStruct |
+| Códigos HTTP y validación de entrada | Configuración de Spring |
+
+## Dónde mirarlo
+- `src/test/java/com/vetSystem/vet_system/service/DuenoServiceTest.java`
+- `src/test/java/com/vetSystem/vet_system/service/TurnoServiceTest.java`
+- `src/test/java/com/vetSystem/vet_system/controller/DuenoControllerTest.java`
+- `pom.xml` — `spring-boot-starter-webmvc-test`
+
+## Preguntas probables
+1. *¿Diferencia entre `@Mock` y `@MockitoBean`?* `@Mock` es Mockito puro, sin Spring.
+   `@MockitoBean` crea el mock y lo **registra como bean** en el contexto de Spring,
+   reemplazando al real. Se usa con `@WebMvcTest`.
+2. *¿Por qué no `@SpringBootTest`?* Levanta el contexto completo y se conecta a la base: lento
+   y depende de MySQL. Para probar un Service alcanza con Mockito; para un Controller, con
+   `@WebMvcTest`.
+3. *¿Qué prueba `DuenoControllerTest` que `DuenoServiceTest` no?* El routing, la
+   serialización JSON, `@Valid` y el `GlobalExceptionHandler`. El test del 404 verifica que la
+   excepción del Service termina como `ErrorResponse` con `status: 404`.
+4. *¿Cómo sabés que un test sirve?* Rompiendo el código a propósito y viendo que falla.
+5. *¿Por qué `verifyNoInteractions(duenoService)` en el test del 400?* Prueba el *fast fail*:
+   `@Valid` rechazó la petición antes de llegar al Service.
+
+---
+
 ## Decisiones YAGNI tomadas
 
 Los documentos de la materia traen código que nadie llama. Se omitió a propósito:
@@ -381,6 +502,7 @@ git log --oneline                      # un commit por sprint
 git show sprint-03:<ruta-del-archivo>  # ver un archivo como quedó en ese sprint
 git diff sprint-03 sprint-04           # qué cambió el refactor a DTOs
 git diff sprint-04 sprint-05 -- src/main/java/com/vetSystem/vet_system/controller/
+./mvnw test                            # desde sprint-06: corre los tests
 ```
 
 Ese último comando es el más útil para el oral: muestra exactamente cómo desaparecieron los

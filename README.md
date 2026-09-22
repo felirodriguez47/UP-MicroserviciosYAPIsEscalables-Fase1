@@ -11,7 +11,7 @@ Sistema de gestión de una clínica veterinaria, construido sprint a sprint desd
 - [Nombre Apellido 1] — TODO
 - [Nombre Apellido 2] — TODO
 
-## Sprint actual: Sprint 5 — Validaciones + manejo global de errores
+## Sprint actual: Sprint 6 — Testing: JUnit 5 + Mockito + MockMvc
 
 API REST completa de la clínica: CRUD de Dueño, Mascota, Veterinario y Turno, con DTOs,
 validación de entrada y respuestas de error uniformes.
@@ -27,6 +27,7 @@ validación de entrada y respuestas de error uniformes.
 | 3 | `sprint-03` | Relaciones + CRUD Mascota + JSON circular |
 | 4 | `sprint-04` | DTOs + MapStruct + CRUD Turno y Veterinario |
 | 5 | `sprint-05` | Bean Validation + `@ControllerAdvice` |
+| 6 | `sprint-06` | Tests: JUnit 5 + Mockito + MockMvc (`./mvnw test`) |
 
 ## Stack
 
@@ -212,6 +213,10 @@ Salida real de las pruebas de cada sprint:
 [`05`](docs/evidencia-sprint-05.txt)
 
 ## Definition of Done
+
+**Sprint 6** — `DuenoServiceTest` (6) · `TurnoServiceTest` (2) · `DuenoControllerTest` (5) ·
+patrón AAA · `verify(never())` en los casos de error · sin `@SpringBootTest` ·
+`./mvnw test` → BUILD SUCCESS con 13 tests. ✅
 
 **Sprint 5** — Bean Validation en los 4 DTOs de entrada · `@Valid` en todos los POST/PUT ·
 `ErrorResponse` · `GlobalExceptionHandler` con 9 handlers · excepciones tipadas ·

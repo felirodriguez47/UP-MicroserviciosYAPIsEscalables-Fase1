@@ -78,10 +78,17 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Testing (para sprints siguientes) -->
+        <!-- Testing: JUnit 5 + Mockito + AssertJ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- @WebMvcTest + MockMvc. Desde Spring Boot 4 los "test slices" viven en
+             modulos separados: spring-boot-starter-test ya no los incluye. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
