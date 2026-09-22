@@ -48,7 +48,8 @@ class TurnoServiceTest {
         // Arrange: las tres validaciones pasan
         when(mascotaRepository.findById(1L)).thenReturn(Optional.of(new Mascota()));
         when(veterinarioRepository.findById(1L)).thenReturn(Optional.of(new Veterinario()));
-        when(turnoRepository.existsByVeterinarioIdAndFechaAndHora(1L, FECHA, HORA)).thenReturn(false);
+        when(turnoRepository.findFirstByVeterinarioIdAndFechaAndHoraAndEstadoNot(1L, FECHA, HORA, EstadoTurno.CANCELADO))
+                .thenReturn(Optional.empty());
         when(turnoRepository.save(any(Turno.class))).thenAnswer(inv -> inv.getArgument(0));
         when(turnoMapper.toDTO(any(Turno.class))).thenReturn(new TurnoResponseDTO());
 
@@ -68,10 +69,17 @@ class TurnoServiceTest {
         // Arrange
         when(mascotaRepository.findById(1L)).thenReturn(Optional.of(new Mascota()));
         when(veterinarioRepository.findById(1L)).thenReturn(Optional.of(new Veterinario()));
-        when(turnoRepository.existsByVeterinarioIdAndFechaAndHora(1L, FECHA, HORA)).thenReturn(true);
+        Turno existente = new Turno();
+        existente.setId(7L);
+        existente.setFecha(FECHA);
+        existente.setHora(HORA);
+        when(turnoRepository.findFirstByVeterinarioIdAndFechaAndHoraAndEstadoNot(1L, FECHA, HORA, EstadoTurno.CANCELADO))
+                .thenReturn(Optional.of(existente));
 
         // Act + Assert
-        assertThrows(TurnoSuperpuestoException.class, () -> turnoService.createTurno(request));
+        TurnoSuperpuestoException ex = assertThrows(TurnoSuperpuestoException.class,
+                () -> turnoService.createTurno(request));
+        assertThat(ex.getMessage()).contains("turno 7").contains("2027-07-10").contains("10:30");
 
         verify(turnoRepository, never()).save(any());
         verifyNoInteractions(turnoMapper);

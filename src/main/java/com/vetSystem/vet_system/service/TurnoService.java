@@ -63,12 +63,13 @@ public class TurnoService {
         Veterinario veterinario = veterinarioRepository.findById(request.getVeterinarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("Veterinario", request.getVeterinarioId()));
 
-        if (turnoRepository.existsByVeterinarioIdAndFechaAndHora(
-                request.getVeterinarioId(), request.getFecha(), request.getHora())) {
-            throw new TurnoSuperpuestoException(
-                    "El veterinario " + request.getVeterinarioId()
-                            + " ya tiene un turno el " + request.getFecha() + " a las " + request.getHora());
-        }
+        turnoRepository.findFirstByVeterinarioIdAndFechaAndHoraAndEstadoNot(
+                        request.getVeterinarioId(), request.getFecha(), request.getHora(), EstadoTurno.CANCELADO)
+                .ifPresent(conflicto -> {
+                    throw new TurnoSuperpuestoException(
+                            "El veterinario " + request.getVeterinarioId() + " ya tiene el turno "
+                                    + conflicto.getId() + " el " + conflicto.getFecha() + " a las " + conflicto.getHora());
+                });
 
         Turno turno = new Turno();
         turno.setFecha(request.getFecha());
