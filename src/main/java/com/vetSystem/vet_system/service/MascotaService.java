@@ -1,6 +1,7 @@
 package com.vetSystem.vet_system.service;
 
 import com.vetSystem.vet_system.dto.MascotaDTO;
+import com.vetSystem.vet_system.exception.CupoMascotasExcedidoException;
 import com.vetSystem.vet_system.exception.DuplicateResourceException;
 import com.vetSystem.vet_system.exception.ResourceNotFoundException;
 import com.vetSystem.vet_system.mapper.MascotaMapper;
@@ -17,6 +18,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class MascotaService {
+
+    static final int MAX_MASCOTAS_POR_DUENO = 5;
 
     private final MascotaRepository mascotaRepository;
     private final DuenoRepository duenoRepository;
@@ -53,6 +56,14 @@ public class MascotaService {
         if (mascotaRepository.existsByNombreAndDuenoId(dto.getNombre(), duenoId)) {
             throw new DuplicateResourceException(
                     "El dueno " + duenoId + " ya tiene una mascota llamada " + dto.getNombre());
+        }
+
+        // Toda mascota guardada cuenta como activa: el DELETE es fisico, y una mascota
+        // con turnos no se puede borrar (la FK de turnos lo impide).
+        long cantidad = mascotaRepository.countByDuenoId(duenoId);
+        if (cantidad >= MAX_MASCOTAS_POR_DUENO) {
+            throw new CupoMascotasExcedidoException("El dueno " + duenoId + " ya tiene " + cantidad
+                    + " mascotas registradas y el maximo es " + MAX_MASCOTAS_POR_DUENO);
         }
 
         Mascota mascota = mascotaMapper.toEntity(dto);

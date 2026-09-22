@@ -83,9 +83,9 @@ public class GlobalExceptionHandler {
         return construir(HttpStatus.CONFLICT, ex.getMessage(), req);
     }
 
-    @ExceptionHandler(StockInsuficienteException.class)
-    public ResponseEntity<ErrorResponse> handleStockInsuficiente(StockInsuficienteException ex,
-                                                                 HttpServletRequest req) {
+    /** Datos validos pero la regla de negocio no se puede cumplir -> 422. */
+    @ExceptionHandler({StockInsuficienteException.class, CupoMascotasExcedidoException.class})
+    public ResponseEntity<ErrorResponse> handleReglaDeNegocio(RuntimeException ex, HttpServletRequest req) {
         return construir(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), req);
     }
 

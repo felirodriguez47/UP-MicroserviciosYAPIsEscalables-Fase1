@@ -21,4 +21,7 @@ public interface MascotaRepository extends JpaRepository<Mascota, Long> {
     // SELECT COUNT(*) > 0 FROM mascotas WHERE nombre = ? AND dueno_id = ?
     // Un mismo dueno no puede tener dos mascotas con el mismo nombre.
     boolean existsByNombreAndDuenoId(String nombre, Long duenoId);
+
+    // SELECT COUNT(*) FROM mascotas WHERE dueno_id = ?
+    long countByDuenoId(Long duenoId);
 }
